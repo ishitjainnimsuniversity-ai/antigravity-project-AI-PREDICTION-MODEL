@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced AI Healthcare Deep Learning Model Prediction</title>
+    <meta name="description" content="AI-powered dermatological and ocular diagnostic system using MobileNetV2 deep learning for real-time skin condition analysis and holistic health projections.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- PARTICLE CANVAS -->
+    <canvas id="particleCanvas"></canvas>
+
+    <!-- HEADER -->
+    <header id="mainHeader">
+        <div class="header-glow"></div>
+        <div class="header-content">
+            <div class="logo-section">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="20" stroke="url(#logoGrad)" stroke-width="2.5"/><path d="M16 24C16 19.6 19.6 16 24 16C28.4 16 32 19.6 32 24" stroke="url(#logoGrad)" stroke-width="2" stroke-linecap="round"/><circle cx="24" cy="28" r="4" fill="url(#logoGrad)"/><defs><linearGradient id="logoGrad" x1="0" y1="0" x2="48" y2="48"><stop stop-color="#00d2ff"/><stop offset="1" stop-color="#7b2ff7"/></linearGradient></defs></svg>
+                </div>
+                <div class="logo-text">
+                    <h1>Advanced AI Healthcare</h1>
+                    <p class="subtitle">Deep Learning Model Prediction</p>
+                </div>
+            </div>
+            <div class="header-badge">
+                <span class="pulse-dot"></span>
+                <span id="statusBadge">SYSTEM ONLINE</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT -->
+    <main id="appMain">
+
+        <!-- ─── SECTION 1: PATIENT REGISTRATION ─── -->
+        <section id="registrationSection" class="glass-card active-section">
+            <div class="section-header">
+                <div class="section-icon">👤</div>
+                <div>
+                    <h2>Patient Profile Registration</h2>
+                    <p class="section-sub">Enter patient biometric data to initialize the diagnostic engine</p>
+                </div>
+            </div>
+            <div class="form-grid">
+                <div class="input-group">
+                    <label for="patientName">Full Name</label>
+                    <input type="text" id="patientName" placeholder="e.g. Ishit Jain" autocomplete="off">
+                </div>
+                <div class="input-group">
+                    <label for="patientAge">Age (Years)</label>
+                    <input type="number" id="patientAge" placeholder="e.g. 25" min="1" max="120">
+                </div>
+            </div>
+            <button id="btnProceed" class="btn-primary" onclick="proceedToScan()">
+                <span>Initialize Diagnostic Engine</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </button>
+        </section>
+
+        <!-- ─── SECTION 2: SCAN MODE SELECTION ─── -->
+        <section id="scanSection" class="glass-card hidden-section">
+            <div class="section-header">
+                <div class="section-icon">🔬</div>
+                <div>
+                    <h2>Select Diagnostic Mode</h2>
+                    <p class="section-sub">Choose between live camera scanning or image upload analysis</p>
+                </div>
+            </div>
+            <div class="mode-cards">
+                <div class="mode-card" id="cameraMode" onclick="startCamera()">
+                    <div class="mode-icon-wrap">
+                        <svg viewBox="0 0 48 48" fill="none"><rect x="4" y="10" width="40" height="28" rx="4" stroke="currentColor" stroke-width="2.5"/><circle cx="24" cy="24" r="8" stroke="currentColor" stroke-width="2.5"/><circle cx="24" cy="24" r="3" fill="currentColor"/><rect x="30" y="14" width="6" height="4" rx="1" fill="currentColor" opacity="0.4"/></svg>
+                    </div>
+                    <h3>Live Camera Scanner</h3>
+                    <p>Real-time face & retinal HUD analysis with distance guidance</p>
+                    <span class="mode-badge">RECOMMENDED</span>
+                </div>
+                <div class="mode-card" id="uploadMode" onclick="triggerUpload()">
+                    <div class="mode-icon-wrap">
+                        <svg viewBox="0 0 48 48" fill="none"><path d="M8 32l10-12 8 8 6-6 8 10" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><rect x="4" y="6" width="40" height="36" rx="4" stroke="currentColor" stroke-width="2.5"/><circle cx="14" cy="16" r="4" stroke="currentColor" stroke-width="2"/></svg>
+                    </div>
+                    <h3>Upload Photo</h3>
+                    <p>Analyze existing skin/face images from device storage</p>
+                    <span class="mode-badge upload-badge">QUICK SCAN</span>
+                </div>
+            </div>
+            <input type="file" id="fileInput" accept="image/*" style="display:none" onchange="handleUpload(event)">
+        </section>
+
+        <!-- ─── SECTION 3: CAMERA FEED ─── -->
+        <section id="cameraSection" class="glass-card hidden-section">
+            <div class="section-header">
+                <div class="section-icon">📷</div>
+                <div>
+                    <h2>Live Diagnostic Scanner</h2>
+                    <p class="section-sub" id="cameraStatus">Initializing camera feed...</p>
+                </div>
+            </div>
+            <div class="camera-container">
+                <video id="videoFeed" autoplay playsinline></video>
+                <canvas id="overlayCanvas"></canvas>
+                <div class="camera-hud">
+                    <div class="hud-top">
+                        <span id="hudDistance" class="hud-tag hud-wait">POSITIONING...</span>
+                        <span id="hudRetinal" class="hud-tag">RETINAL LOCK: WAIT</span>
+                    </div>
+                    <div class="hud-bottom">
+                        <span id="hudPrediction" class="hud-tag">SCANNING...</span>
+                    </div>
+                </div>
+                <div class="scan-line"></div>
+            </div>
+            <div class="camera-controls">
+                <button class="btn-capture" id="btnCapture" onclick="captureFrame()">
+                    <div class="capture-ring"></div>
+                    <span>CAPTURE & ANALYZE</span>
+                </button>
+                <button class="btn-secondary" onclick="stopCamera()">Stop Scanner</button>
+            </div>
+        </section>
+
+        <!-- ─── SECTION 4: LOADING ─── -->
+        <section id="loadingSection" class="glass-card hidden-section">
+            <div class="loading-content">
+                <div class="dna-helix">
+                    <div class="helix-strand strand-1"></div>
+                    <div class="helix-strand strand-2"></div>
+                </div>
+                <h2>Neural Analysis in Progress</h2>
+                <p id="loadingText">Processing bio-signature through MobileNetV2 engine...</p>
+                <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+            </div>
+        </section>
+
+        <!-- ─── SECTION 5: RESULTS DASHBOARD ─── -->
+        <section id="resultsSection" class="hidden-section">
+
+            <!-- Top Result Banner -->
+            <div class="result-banner glass-card" id="resultBanner">
+                <div class="result-main">
+                    <div class="result-icon" id="resultIcon">🔬</div>
+                    <div class="result-text">
+                        <p class="result-label">PRIMARY DIAGNOSIS</p>
+                        <h2 id="resultPrediction">—</h2>
+                        <p id="resultDescription" class="result-desc"></p>
+                    </div>
+                </div>
+                <div class="confidence-ring" id="confidenceRing">
+                    <svg viewBox="0 0 120 120">
+                        <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="8"/>
+                        <circle id="confCircle" cx="60" cy="60" r="52" fill="none" stroke="url(#confGrad)" stroke-width="8" stroke-linecap="round" stroke-dasharray="327" stroke-dashoffset="327" transform="rotate(-90 60 60)"/>
+                        <defs><linearGradient id="confGrad"><stop stop-color="#00d2ff"/><stop offset="1" stop-color="#7b2ff7"/></linearGradient></defs>
+                    </svg>
+                    <div class="conf-value">
+                        <span id="confPercent">0</span><small>%</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Patient Info Bar -->
+            <div class="info-bar glass-card">
+                <div class="info-item"><span class="info-label">PATIENT</span><span id="infoName" class="info-value">—</span></div>
+                <div class="info-item"><span class="info-label">AGE</span><span id="infoAge" class="info-value">—</span></div>
+                <div class="info-item"><span class="info-label">ENGINE</span><span class="info-value">MobileNetV2</span></div>
+                <div class="info-item"><span class="info-label">TIMESTAMP</span><span id="infoTime" class="info-value">—</span></div>
+            </div>
+
+            <!-- Grid: Probabilities + Prescriptions -->
+            <div class="results-grid">
+
+                <!-- Probability Bars -->
+                <div class="glass-card result-panel">
+                    <h3 class="panel-title">🧬 Classification Probabilities</h3>
+                    <div id="probBars" class="prob-bars"></div>
+                </div>
+
+                <!-- Skin Prescription -->
+                <div class="glass-card result-panel">
+                    <h3 class="panel-title">💊 Dermal Recovery Protocol</h3>
+                    <div class="rx-card">
+                        <div class="rx-section">
+                            <span class="rx-icon">💉</span>
+                            <div><p class="rx-label">MEDICINE & TOPICAL</p><p id="rxTreatment" class="rx-text"></p></div>
+                        </div>
+                        <div class="rx-section">
+                            <span class="rx-icon">🥗</span>
+                            <div><p class="rx-label">NUTRITIONAL PLAN</p><p id="rxDiet" class="rx-text"></p></div>
+                        </div>
+                        <div class="rx-section">
+                            <span class="rx-icon">🎯</span>
+                            <div><p class="rx-label">AGE-SPECIFIC ADVICE</p><p id="rxAge" class="rx-text"></p></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Eye Prescription -->
+                <div class="glass-card result-panel">
+                    <h3 class="panel-title">👁️ Ocular Maintenance Protocol</h3>
+                    <div class="eye-status-display">
+                        <div class="eye-ring">
+                            <div class="eye-inner" id="eyeInner">
+                                <span id="eyeStatusText">—</span>
+                            </div>
+                        </div>
+                        <div class="eye-rx-list">
+                            <div class="eye-rx-item"><span class="rx-dot care"></span><span class="rx-label-sm">CARE</span><span id="eyeCare" class="rx-val">—</span></div>
+                            <div class="eye-rx-item"><span class="rx-dot fruit"></span><span class="rx-label-sm">FRUITS</span><span id="eyeFruits" class="rx-val">—</span></div>
+                            <div class="eye-rx-item"><span class="rx-dot med"></span><span class="rx-label-sm">MEDICINE</span><span id="eyeMed" class="rx-val">—</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 10-Year Projection Chart -->
+                <div class="glass-card result-panel chart-panel">
+                    <h3 class="panel-title">📈 10-Year Bio-Stability Projection</h3>
+                    <div class="chart-container">
+                        <canvas id="projectionChart"></canvas>
+                    </div>
+                    <div class="chart-footer">
+                        <span>Risk Factor: <strong id="riskFactor">—</strong></span>
+                        <span>Engine: MobileNetV2 Transfer Learning</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="result-actions">
+                <button class="btn-primary" onclick="resetApp()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 4v6h6M23 20v-6h-6"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/></svg>
+                    <span>New Scan</span>
+                </button>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- FOOTER -->
+    <footer>
+        <p>Advanced AI Healthcare Deep Learning Model Prediction — Powered by MobileNetV2 &amp; TensorFlow</p>
+        <p class="disclaimer">This system is for diagnostic simulation only. Consult a certified medical professional for clinical validation.</p>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>
