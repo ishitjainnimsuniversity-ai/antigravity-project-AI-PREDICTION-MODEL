@@ -1,0 +1,10 @@
+*.pdf
+*.png
+*.keras
+Skin_Dataset/
+__pycache__/
+.ipynb_checkpoints/
+*.exe
+*.msi
+*.zip
+*.rar
