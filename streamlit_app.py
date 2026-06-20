@@ -119,7 +119,7 @@ def get_model():
     return model
 
 # --- HELPER FUNCTIONS ---
-def predict_skin(img):
+def predict_skin(img, age=25):
     # Check if a custom trained model exists
     has_custom_model = os.path.exists(DEFAULT_MODEL_PATH)
     
@@ -139,6 +139,7 @@ def predict_skin(img):
     g_ratio = g_mean / total_val
     
     scores = np.zeros(5)
+    # Base heuristic scoring based on image features
     # 0: Acne, 1: Eczema, 2: Psoriasis, 3: Wrinkles, 4: Healthy Skin
     scores[0] = r_ratio * 2.0 - abs(std_dev - 30) / 100.0
     scores[1] = r_ratio * 1.8 + (std_dev / 255.0) * 0.5
@@ -146,6 +147,30 @@ def predict_skin(img):
     scores[3] = (std_dev / 255.0) * 1.5 - abs(r_ratio - 0.35) * 2.5
     scores[4] = 0.8 - (std_dev / 255.0) * 1.5 - abs(r_ratio - 0.33) * 2.0
     
+    # Apply clinical age biases to ensure age-specific realism
+    if age < 20:
+        # Teenagers/Youth: Higher chance of Acne or Healthy Skin, very low chance of wrinkles
+        scores[0] += 0.6  # Acne
+        scores[3] -= 1.5  # Wrinkles
+        scores[4] += 0.3  # Healthy Skin
+    elif age < 35:
+        # Young Adults: Higher chance of Healthy Skin or Eczema, low chance of wrinkles
+        scores[3] -= 0.8  # Wrinkles
+        scores[4] += 0.4  # Healthy Skin
+        scores[0] += 0.2  # Acne
+    elif age < 55:
+        # Middle Age: Higher Eczema, Psoriasis, or early Wrinkles
+        scores[1] += 0.3  # Eczema
+        scores[2] += 0.3  # Psoriasis
+        scores[3] += 0.4  # Wrinkles
+        scores[4] -= 0.2  # Healthy Skin
+    else:
+        # Seniors: High chance of Wrinkles, dry skin conditions like Eczema/Psoriasis, zero acne
+        scores[0] -= 1.5  # Acne
+        scores[3] += 1.2  # Wrinkles
+        scores[1] += 0.4  # Eczema
+        scores[4] -= 0.6  # Healthy Skin
+        
     exp_scores = np.exp(scores - np.max(scores))
     heuristic_probs = exp_scores / np.sum(exp_scores)
     
@@ -323,7 +348,7 @@ with col1:
         
         if st.button("RUN DEEP ANALYSIS"):
             with st.spinner("Decoding Neural Patterns (Initializing Deep Learning Model)..."):
-                label, conf, probs = predict_skin(img)
+                label, conf, probs = predict_skin(img, patient_age)
                 st.session_state['diagnosis'] = (label, conf, probs, img)
 
 with col2:
@@ -394,7 +419,7 @@ with col2:
             plt.close(pdf_fig)
             
             # Generate the beautiful PDF report
-            pdf_bytes = generate_pdf(
+            pdf_bytes = bytes(generate_pdf(
                 name=patient_name,
                 age=patient_age,
                 prediction=label,
@@ -403,7 +428,7 @@ with col2:
                 eye_rx=eye_rx,
                 img=img,
                 plot_buf=pdf_plot_buf
-            )
+            ))
             
             # Show download buttons in columns
             btn_col1, btn_col2 = st.columns(2)
