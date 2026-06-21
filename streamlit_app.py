@@ -81,6 +81,66 @@ EYE_PRESCRIPTIONS = {
     "Optimal": {"FRUITS": "Goji Berries", "MED": "Omega-3", "CARE": "Schedule yearly preventative check-up"}
 }
 
+def get_clinical_plan(prediction, age):
+    # Determine the focus/advice based on age group
+    if age < 20:
+        age_focus = "Teens & Youth: Focus on sebum control, hydration, and skin barrier protection. Harsh retinoids are NOT recommended."
+        retinol_treatment = "Avoid pure Retinol. Instead, use a gentle botanical alternative like Bakuchiol Serum (0.5% at night) to prevent irritation."
+        if prediction == "Acne":
+            topical_treatment = "Apply Salicylic Acid 2% (BHA) Cleanser and Niacinamide 5% Serum. Use a light, oil-free moisturizer."
+        elif prediction == "Eczema":
+            topical_treatment = "Use Colloidal Oatmeal cream, Ceramide NP moisturizer, and avoid salicylic acid or harsh cleansers."
+        elif prediction == "Psoriasis":
+            topical_treatment = "Apply Coal Tar gel or mild Hydrocortisone cream (OTC). Keep skin deeply hydrated with Urea 5% cream."
+        elif prediction == "Wrinkles":
+            topical_treatment = "Focus on SPF 50+ sunscreen daily and Hyaluronic Acid serum. Preventative hydration is key."
+        else: # Healthy Skin
+            topical_treatment = "Gentle foaming cleanser, light Aloe Vera gel moisturizer, and daily mineral sunscreen (SPF 30+)."
+            
+    elif age < 35:
+        age_focus = "Young Adults (20-34): Focus on prevention, cell turnover, and defense against environmental stress."
+        retinol_treatment = "Introduce a low-strength Retinol (0.2% - 0.3% Serum) 2-3 nights per week to build skin tolerance."
+        if prediction == "Acne":
+            topical_treatment = "Use Benzoyl Peroxide 2.5% spot treatment and Glycolic Acid 5% toner (twice a week). Hydrate with Hyaluronic Acid."
+        elif prediction == "Eczema":
+            topical_treatment = "Apply rich Ceramide NP cream and soothing Panthenol (Vitamin B5) serum twice daily."
+        elif prediction == "Psoriasis":
+            topical_treatment = "Use Salicylic Acid 3% cream to remove scales, followed by a heavy barrier repair cream containing Shea Butter."
+        elif prediction == "Wrinkles":
+            topical_treatment = "Apply Vitamin C (L-Ascorbic Acid 10%) in the morning. Use Peptide Serums to support collagen production."
+        else: # Healthy Skin
+            topical_treatment = "Double cleanse, use Niacinamide 10% daily to maintain tone, and apply Ceramide moisturizer at night."
+
+    elif age < 55:
+        age_focus = "Middle-Aged Adults (35-54): Focus on cellular regeneration, correcting fine lines, and restoring lipid barrier."
+        retinol_treatment = "Use standard-strength Retinol (0.5% - 1.0% Serum) or prescription Tretinoin (0.025% cream) at night."
+        if prediction == "Acne":
+            topical_treatment = "Apply Azelaic Acid 10% (excellent for adult acne and dark spots) and gentle Salicylic Acid spot treatment."
+        elif prediction == "Eczema":
+            topical_treatment = "Apply prescription-strength emollients (consult dermatologist) and barrier-repair creams with Squalane."
+        elif prediction == "Psoriasis":
+            topical_treatment = "Use Topical Corticosteroids (under medical supervision) combined with Vitamin D analogues (Calcipotriene)."
+        elif prediction == "Wrinkles":
+            topical_treatment = "Apply Vitamin C 15% in the morning, copper peptides, and a rich moisturizer with Hyaluronic Acid."
+        else: # Healthy Skin
+            topical_treatment = "Hyaluronic Acid serum, Coenzyme Q10 antioxidant cream, and Ceramides for barrier maintenance."
+
+    else:
+        age_focus = "Seniors (55+): Focus on intense nourishment, lipid barrier restoration, and reversing deep photo-aging."
+        retinol_treatment = "Use prescription-strength Retinoids (Tretinoin 0.05% or Retinaldehyde 0.1%) paired with a rich barrier balm."
+        if prediction == "Acne":
+            topical_treatment = "Use mild Lactic Acid (AHA) cleansers to prevent dryness, and apply Azelaic Acid for spot correction."
+        elif prediction == "Eczema":
+            topical_treatment = "Apply heavy lipid-replenishing balms (containing cholesterol, fatty acids, and ceramides in a 1:2:1 ratio)."
+        elif prediction == "Psoriasis":
+            topical_treatment = "Use Urea 10% cream, salicylic acid scale lifters, and prescription topical therapies (Consult MD)."
+        elif prediction == "Wrinkles":
+            topical_treatment = "Apply Matrixyl 3000 (Peptides), Vitamin C 20% serum, and rich moisturizers containing Squalane."
+        else: # Healthy Skin
+            topical_treatment = "Gentle milky cleansers, Squalane oil, and rich Ceramide creams to seal moisture."
+
+    return age_focus, topical_treatment, retinol_treatment
+
 IMG_SIZE = 128
 DEFAULT_MODEL_PATH = "trained_skin_model.keras"
 
@@ -124,58 +184,82 @@ def predict_skin(img, age=25):
     has_custom_model = os.path.exists(DEFAULT_MODEL_PATH)
     
     img = img.convert('RGB')
+    arr = np.array(img, dtype=np.float32)
     
-    # Heuristic analysis to prevent "same result for all" when model is untrained
-    arr = np.array(img)
-    r_mean = np.mean(arr[:, :, 0])
-    g_mean = np.mean(arr[:, :, 1])
-    b_mean = np.mean(arr[:, :, 2])
+    R = arr[:, :, 0]
+    G = arr[:, :, 1]
+    B = arr[:, :, 2]
     
+    # 1. Skin Color Masking (standard rules for detecting human skin tones)
+    skin_mask = (R > 95) & (G > 40) & (B > 20) & (R > G) & (R > B) & (np.abs(R - G) > 15)
+    if np.sum(skin_mask) < 100:
+        skin_mask = np.ones_like(R, dtype=bool) # Fallback to entire image
+        
+    R_skin = R[skin_mask]
+    G_skin = G[skin_mask]
+    B_skin = B[skin_mask]
+    
+    # 2. Redness Extraction (for Acne/Eczema/Inflammations)
+    total_val = R_skin + G_skin + B_skin + 1e-5
+    r_ratio = R_skin / total_val
+    mean_redness = np.mean(r_ratio)
+    red_spots_ratio = np.sum(r_ratio > 0.38) / len(r_ratio)
+    
+    # 3. Fine Edge & Texture Analysis (for wrinkles and scaling)
     gray = img.convert('L')
-    std_dev = np.std(np.array(gray))
+    gray_arr = np.array(gray, dtype=np.float32)
     
-    total_val = r_mean + g_mean + b_mean + 1e-5
-    r_ratio = r_mean / total_val
-    g_ratio = g_mean / total_val
+    # Simple Sobel-like edge/variance analysis
+    grad_x = np.abs(gray_arr[:, 1:] - gray_arr[:, :-1])
+    grad_y = np.abs(gray_arr[1:, :] - gray_arr[:-1, :])
+    mean_grad = np.mean(grad_x) + np.mean(grad_y)
     
+    # Overall local intensity standard deviation (contrast/roughness)
+    std_dev = np.std(gray_arr)
+    
+    # 4. Neural Network or Heuristic decision
     scores = np.zeros(5)
-    # Base heuristic scoring based on image features
     # 0: Acne, 1: Eczema, 2: Psoriasis, 3: Wrinkles, 4: Healthy Skin
-    scores[0] = r_ratio * 2.0 - abs(std_dev - 30) / 100.0
-    scores[1] = r_ratio * 1.8 + (std_dev / 255.0) * 0.5
-    scores[2] = abs(r_ratio - g_ratio) * 2.5 + (std_dev / 255.0) * 1.2
-    scores[3] = (std_dev / 255.0) * 1.5 - abs(r_ratio - 0.35) * 2.5
-    scores[4] = 0.8 - (std_dev / 255.0) * 1.5 - abs(r_ratio - 0.33) * 2.0
+    
+    # Acne: characterized by localized red spots
+    scores[0] = red_spots_ratio * 15.0 - (mean_grad / 15.0) - 2.0
+    
+    # Eczema: red patches with moderate roughness
+    scores[1] = mean_redness * 12.0 + (std_dev / 50.0) * 3.0 - 6.0
+    
+    # Psoriasis: scaling, rough texture with moderate redness
+    scores[2] = (std_dev / 50.0) * 6.0 + red_spots_ratio * 4.0 - 3.0
+    
+    # Wrinkles: high fine edges, low redness
+    scores[3] = (mean_grad / 10.0) * 4.0 - red_spots_ratio * 10.0 - 1.0
+    
+    # Healthy Skin: low redness, low texture roughness
+    scores[4] = 5.0 - red_spots_ratio * 18.0 - (std_dev / 50.0) * 6.0
     
     # Apply clinical age biases to ensure age-specific realism
     if age < 20:
-        # Teenagers/Youth: Higher chance of Acne or Healthy Skin, very low chance of wrinkles
-        scores[0] += 0.6  # Acne
-        scores[3] -= 1.5  # Wrinkles
-        scores[4] += 0.3  # Healthy Skin
-    elif age < 35:
-        # Young Adults: Higher chance of Healthy Skin or Eczema, low chance of wrinkles
-        scores[3] -= 0.8  # Wrinkles
+        scores[0] += 0.8  # Acne
+        scores[3] -= 2.0  # Wrinkles
         scores[4] += 0.4  # Healthy Skin
-        scores[0] += 0.2  # Acne
+    elif age < 35:
+        scores[3] -= 1.0  # Wrinkles
+        scores[4] += 0.5  # Healthy Skin
+        scores[0] += 0.3  # Acne
     elif age < 55:
-        # Middle Age: Higher Eczema, Psoriasis, or early Wrinkles
         scores[1] += 0.3  # Eczema
         scores[2] += 0.3  # Psoriasis
-        scores[3] += 0.4  # Wrinkles
-        scores[4] -= 0.2  # Healthy Skin
+        scores[3] += 0.5  # Wrinkles
+        scores[4] -= 0.3  # Healthy Skin
     else:
-        # Seniors: High chance of Wrinkles, dry skin conditions like Eczema/Psoriasis, zero acne
-        scores[0] -= 1.5  # Acne
-        scores[3] += 1.2  # Wrinkles
-        scores[1] += 0.4  # Eczema
-        scores[4] -= 0.6  # Healthy Skin
-        
+        scores[0] -= 2.0  # Acne
+        scores[3] += 1.5  # Wrinkles
+        scores[1] += 0.5  # Eczema
+        scores[4] -= 0.8  # Healthy Skin
+
     exp_scores = np.exp(scores - np.max(scores))
     heuristic_probs = exp_scores / np.sum(exp_scores)
     
     if has_custom_model:
-        # Use custom neural network if loaded
         try:
             import tensorflow as tf
             model = get_model()
@@ -189,7 +273,6 @@ def predict_skin(img, age=25):
         except Exception:
             final_probs = heuristic_probs
     else:
-        # Untrained fallback: Use heuristic model directly so results are diverse and realistic
         final_probs = heuristic_probs
         
     class_index = np.argmax(final_probs)
@@ -200,7 +283,7 @@ def predict_skin(img, age=25):
     return SKIN_CLASSES[class_index], confidence, final_probs
 
 
-def generate_pdf(name, age, prediction, treatment, diet, eye_rx, img, plot_buf):
+def generate_pdf(name, age, prediction, topical_rx, retinol_rx, diet, eye_rx, img, plot_buf):
     pdf = FPDF()
     pdf.add_page()
     
@@ -278,10 +361,19 @@ def generate_pdf(name, age, prediction, treatment, diet, eye_rx, img, plot_buf):
     # Skin Protocol
     pdf.set_font("Arial", 'B', 10)
     pdf.set_text_color(180, 0, 0)
-    pdf.cell(0, 8, ">> DERMAL RECOVERY PROTOCOL (SKIN MEDICINE):", ln=True)
+    pdf.cell(0, 8, ">> DERMAL RECOVERY PROTOCOL (TOPICAL MEDICINE):", ln=True)
     pdf.set_font("Arial", '', 10)
     pdf.set_text_color(0, 0, 0)
-    pdf.multi_cell(0, 6, treatment)
+    pdf.multi_cell(0, 6, topical_rx)
+    pdf.ln(4)
+
+    # Retinol Protocol
+    pdf.set_font("Arial", 'B', 10)
+    pdf.set_text_color(120, 0, 120)
+    pdf.cell(0, 8, ">> RETINOL / RETINOID THERAPY (NIGHTTIME):", ln=True)
+    pdf.set_font("Arial", '', 10)
+    pdf.set_text_color(0, 0, 0)
+    pdf.multi_cell(0, 6, retinol_rx)
     pdf.ln(4)
     
     # Diet Protocol
@@ -366,9 +458,17 @@ with col2:
         # Treatment & Diet
         tab1, tab2, tab3 = st.tabs(["💊 Treatment", "🥗 Nutrition", "📈 Bio-Forecast"])
         
+        # Compute age-sensitive dermal plan
+        age_focus, topical_rx, retinol_rx = get_clinical_plan(label, patient_age)
+        
         with tab1:
-            st.write(f"**Clinical Protocol:** {TREATMENTS.get(label)}")
-            st.warning("Note: Always consult a certified dermatologist before starting medication.")
+            st.markdown(f"### 🎯 Age Focus Focus")
+            st.info(age_focus)
+            st.markdown(f"### 💊 Topical Treatment Protocol")
+            st.write(topical_rx)
+            st.markdown(f"### 🌙 Retinoid Therapy (Retinal)")
+            st.write(retinol_rx)
+            st.warning("Note: Always consult a certified dermatologist before starting active ingredients.")
         
         with tab2:
             st.write(f"**Nutritional Strategy:** {DIETS.get(label)}")
@@ -423,7 +523,8 @@ with col2:
                 name=patient_name,
                 age=patient_age,
                 prediction=label,
-                treatment=TREATMENTS.get(label),
+                topical_rx=topical_rx,
+                retinol_rx=retinol_rx,
                 diet=DIETS.get(label),
                 eye_rx=eye_rx,
                 img=img,
@@ -440,7 +541,7 @@ with col2:
                     mime="application/pdf"
                 )
             with btn_col2:
-                report_text = f"Patient: {patient_name}\nAge: {patient_age}\nDiagnosis: {label}\nConfidence: {conf:.1f}%\n\nTreatment: {TREATMENTS.get(label)}\nDiet: {DIETS.get(label)}"
+                report_text = f"Patient: {patient_name}\nAge: {patient_age}\nDiagnosis: {label}\nConfidence: {conf:.1f}%\n\nAge Focus: {age_focus}\n\nTopical Protocol: {topical_rx}\n\nRetinoid Therapy: {retinol_rx}\n\nDiet Strategy: {DIETS.get(label)}"
                 st.download_button(
                     label="📥 Download Report (TXT)",
                     data=report_text,
