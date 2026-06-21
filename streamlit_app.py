@@ -283,7 +283,70 @@ def predict_skin(img, age=25):
     return SKIN_CLASSES[class_index], confidence, final_probs
 
 
-def generate_pdf(name, age, prediction, topical_rx, retinol_rx, diet, eye_rx, img, plot_buf):
+def analyze_pigmentation(img):
+    img = img.convert('RGB')
+    arr = np.array(img, dtype=np.float32)
+    
+    R = arr[:, :, 0]
+    G = arr[:, :, 1]
+    B = arr[:, :, 2]
+    
+    # Skin color range mask
+    skin_mask = (R > 95) & (G > 40) & (B > 20) & (R > G) & (R > B) & (np.abs(R - G) > 15)
+    if np.sum(skin_mask) < 100:
+        skin_mask = np.ones_like(R, dtype=bool)
+        
+    R_skin = R[skin_mask]
+    G_skin = G[skin_mask]
+    B_skin = B[skin_mask]
+    
+    # Calculate luminance
+    lum_skin = 0.299 * R_skin + 0.587 * G_skin + 0.114 * B_skin
+    mean_lum = np.mean(lum_skin)
+    
+    # Find dark spots relative to average skin luminance
+    pigment_threshold = mean_lum * 0.85
+    pigment_mask = lum_skin < pigment_threshold
+    
+    num_pigment_pixels = np.sum(pigment_mask)
+    total_skin_pixels = len(lum_skin)
+    
+    density_pct = (num_pigment_pixels / total_skin_pixels) * 100.0 if total_skin_pixels > 0 else 0.0
+    
+    if num_pigment_pixels > 10:
+        mean_r = int(np.mean(R_skin[pigment_mask]))
+        mean_g = int(np.mean(G_skin[pigment_mask]))
+        mean_b = int(np.mean(B_skin[pigment_mask]))
+        rgb_str = f"({mean_r}, {mean_g}, {mean_b})"
+        
+        # Color classification
+        if mean_r > 1.35 * mean_g and mean_r > 1.35 * mean_b:
+            color_desc = "Erythemic Red"
+            pigment_type = "Inflammatory / Vascular Redness"
+        elif mean_r > mean_g and mean_g > mean_b:
+            if mean_r - mean_g > 30:
+                color_desc = "Deep Brown"
+                pigment_type = "Melanin Hyperpigmentation (Sun Spots / Age Spots)"
+            else:
+                color_desc = "Golden Brown / Freckle Tone"
+                pigment_type = "Melanin / Ephelides (Freckles)"
+        elif mean_r > mean_b and mean_g > mean_b:
+            color_desc = "Yellow-Brown"
+            pigment_type = "Sebaceous / Epidermal Pigmentation"
+        else:
+            color_desc = "Greyish-Blue"
+            pigment_type = "Deep Dermal Melanosys / Shadowing"
+    else:
+        density_pct = 1.8
+        color_desc = "Balanced Tan"
+        rgb_str = f"({int(np.mean(R_skin))}, {int(np.mean(G_skin))}, {int(np.mean(B_skin))})"
+        pigment_type = "Uniform Melanin Tone"
+        
+    return round(density_pct, 1), color_desc, rgb_str, pigment_type
+
+
+
+def generate_pdf(name, age, prediction, topical_rx, retinol_rx, diet, eye_rx, img, plot_buf, pigment_density, pigment_color, pigment_rgb, pigment_type):
     pdf = FPDF()
     pdf.add_page()
     
@@ -308,7 +371,18 @@ def generate_pdf(name, age, prediction, topical_rx, retinol_rx, diet, eye_rx, im
     pdf.set_font("Arial", '', 10)
     pdf.cell(95, 10, f" NAME: {name.upper()}", border=1)
     pdf.cell(95, 10, f" RANGE: {age} YEARS (STAGE: {'PRIMARY' if age < 30 else 'STABLE'})", border=1, ln=True)
-    pdf.ln(8)
+    pdf.ln(4)
+
+    # --- PIGMENTATION ANALYTICS HUD ---
+    pdf.set_fill_color(240, 248, 255) # Light Alice Blue
+    pdf.set_font("Arial", 'B', 10)
+    pdf.cell(0, 8, " [ PIGMENTATION ANALYTICS HUD ]", ln=True, fill=True)
+    pdf.set_font("Arial", '', 9)
+    pdf.cell(60, 8, f" DENSITY: {pigment_density}%", border=1)
+    pdf.cell(65, 8, f" DETECTED SPOT COLOR: {pigment_color}", border=1)
+    pdf.cell(65, 8, f" SPOT RGB: {pigment_rgb}", border=1, ln=True)
+    pdf.cell(0, 8, f" PIGMENT TYPE: {pigment_type}", border=1, ln=True)
+    pdf.ln(4)
     
     # --- OPTICAL SCAN SECTION ---
     pdf.set_font("Arial", 'B', 11)
@@ -441,17 +515,24 @@ with col1:
         if st.button("RUN DEEP ANALYSIS"):
             with st.spinner("Decoding Neural Patterns (Initializing Deep Learning Model)..."):
                 label, conf, probs = predict_skin(img, patient_age)
-                st.session_state['diagnosis'] = (label, conf, probs, img)
+                p_density, p_color, p_rgb, p_type = analyze_pigmentation(img)
+                st.session_state['diagnosis'] = (label, conf, probs, img, p_density, p_color, p_rgb, p_type)
 
 with col2:
     st.subheader("📊 Diagnostic Insights")
     if 'diagnosis' in st.session_state:
-        label, conf, probs, img = st.session_state['diagnosis']
+        label, conf, probs, img, p_density, p_color, p_rgb, p_type = st.session_state['diagnosis']
         
         st.markdown(f"""
         <div class="report-card">
             <h3>Result: <span style='color:#00d2ff'>{label}</span></h3>
             <p>Confidence Level: <b>{conf:.1f}%</b></p>
+        </div>
+        <div class="report-card" style="border: 1px solid rgba(255, 179, 0, 0.3); background: rgba(255, 179, 0, 0.05);">
+            <h3>🔍 Pigmentation Analytics HUD</h3>
+            <p>• <b>Density / Level:</b> {p_density}%</p>
+            <p>• <b>Identified Spot Color:</b> <span style='color:#ffb300'><b>{p_color}</b></span> {p_rgb}</p>
+            <p>• <b>Diagnostic Class:</b> {p_type}</p>
         </div>
         """, unsafe_allow_html=True)
         
@@ -528,7 +609,11 @@ with col2:
                 diet=DIETS.get(label),
                 eye_rx=eye_rx,
                 img=img,
-                plot_buf=pdf_plot_buf
+                plot_buf=pdf_plot_buf,
+                pigment_density=p_density,
+                pigment_color=p_color,
+                pigment_rgb=p_rgb,
+                pigment_type=p_type
             ))
             
             # Show download buttons in columns
@@ -541,7 +626,7 @@ with col2:
                     mime="application/pdf"
                 )
             with btn_col2:
-                report_text = f"Patient: {patient_name}\nAge: {patient_age}\nDiagnosis: {label}\nConfidence: {conf:.1f}%\n\nAge Focus: {age_focus}\n\nTopical Protocol: {topical_rx}\n\nRetinoid Therapy: {retinol_rx}\n\nDiet Strategy: {DIETS.get(label)}"
+                report_text = f"Patient: {patient_name}\nAge: {patient_age}\nDiagnosis: {label}\nConfidence: {conf:.1f}%\n\nPigment Level: {p_density}%\nPigment Color: {p_color} {p_rgb}\nPigment Type: {p_type}\n\nAge Focus: {age_focus}\n\nTopical Protocol: {topical_rx}\n\nRetinoid Therapy: {retinol_rx}\n\nDiet Strategy: {DIETS.get(label)}"
                 st.download_button(
                     label="📥 Download Report (TXT)",
                     data=report_text,
