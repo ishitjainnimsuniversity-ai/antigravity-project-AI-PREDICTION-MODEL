@@ -558,7 +558,7 @@ def run_real_time_webcam(model, patient_name="Guest", age=25):
     cap.release()
     cv2.destroyAllWindows()
 
-def generate_clinical_pdf(name, age, prediction, topical_rx, retinol_rx, diet, eye_rx, image_path, plot_path=None, pigment_density=1.8, pigment_color="Balanced Tan", pigment_rgb="(128, 128, 128)", pigment_type="Uniform Melanin Tone"):
+def generate_clinical_pdf(name, age, prediction, topical_rx, retinol_rx, diet, eye_rx, image_path, plot_path=None, pigment_density=1.8, pigment_color="Balanced Tan", pigment_rgb="(128, 128, 128)", pigment_type="Uniform Melanin Tone", skin_health_score=85.0, eye_status="Normal", retina_score=94.2, probs_pct=None):
     """Generates a futuristic 'Sci-Fi' clinical PDF report with integrated Graph and Scans."""
     from datetime import datetime
     import os
@@ -601,6 +601,27 @@ def generate_clinical_pdf(name, age, prediction, topical_rx, retinol_rx, diet, e
     pdf.cell(65, 8, f" SPOT RGB: {pigment_rgb}", border=1, ln=True)
     pdf.cell(0, 8, f" PIGMENT TYPE: {pigment_type}", border=1, ln=True)
     pdf.ln(4)
+
+    # --- INTEGRATED CLINICAL SCORES HUD ---
+    pdf.set_fill_color(230, 250, 235) # Light Green
+    pdf.set_font("Arial", 'B', 10)
+    pdf.cell(0, 8, " [ INTEGRATED CLINICAL PRESENT SCORECARD ]", ln=True, fill=True)
+    pdf.set_font("Arial", '', 9)
+    pdf.cell(95, 8, f" PRESENT SKIN HEALTH INDEX: {skin_health_score}%", border=1)
+    pdf.cell(95, 8, f" PRESENT RETINA HEALTH INDEX: {retina_score}% ({eye_status})", border=1, ln=True)
+    pdf.ln(4)
+
+    # --- FULL BIO-DERMAL DIAGNOSTIC PROFILE ---
+    if probs_pct:
+        pdf.set_fill_color(245, 240, 255) # Light Purple
+        pdf.set_font("Arial", 'B', 10)
+        pdf.cell(0, 8, " [ NEURAL BIO-DERMAL PROBABILITY BREAKDOWN ]", ln=True, fill=True)
+        pdf.set_font("Arial", '', 9)
+        prob_str1 = f" HEALTHY SKIN: {probs_pct[4]}%  |  ACNE: {probs_pct[0]}%  |  ECZEMA: {probs_pct[1]}%"
+        prob_str2 = f" PSORIASIS: {probs_pct[2]}%  |  WRINKLES: {probs_pct[3]}%"
+        pdf.cell(0, 8, prob_str1, border=1, ln=True)
+        pdf.cell(0, 8, prob_str2, border=1, ln=True)
+        pdf.ln(4)
     
     # --- OPTICAL SCAN SECTION ---
     pdf.set_font("Arial", 'B', 11)
@@ -689,10 +710,33 @@ def display_dashboard(model, image_path, name="Guest", age=25, eye_data=False):
         prediction, confidence, all_confidences, original_img = predict_skin(model, image_path, age)
         p_density, p_color, p_rgb, p_type = analyze_pigmentation(original_img)
         
+        # Dynamic Ocular status based on red channels in the captured image
+        img_rgb = original_img.convert('RGB')
+        arr_img = np.array(img_rgb)
+        avg_r = np.mean(arr_img[:, :, 0]) if arr_img.size > 0 else 100
+        if avg_r > 160:
+            eye_status = "Strain"
+            retina_score = 78.5 - (age * 0.1)
+        elif avg_r > 120:
+            eye_status = "Fatigue"
+            retina_score = 69.2 - (age * 0.1)
+        elif avg_r > 80:
+            eye_status = "Normal"
+            retina_score = 93.4 - (age * 0.08)
+        else:
+            eye_status = "Optimal"
+            retina_score = 97.8 - (age * 0.05)
+        retina_score = round(np.clip(retina_score, 45.0, 99.5), 1)
+
+        # Dynamic Skin Health Score based on prediction & pigmentation
+        healthy_prob = float(all_confidences[4])
+        skin_health_score = 95.0 - (p_density * 1.2) - (100.0 - healthy_prob) * 0.4
+        if prediction != "Healthy Skin":
+            skin_health_score -= 15.0
+        skin_health_score = round(np.clip(skin_health_score, 15.0, 99.0), 1)
+        
         # Unified Diagnostic Calculations (Dynamic health status)
         skin_food = DIETS.get(prediction, "Antioxidant rich diet")
-        
-        eye_status = np.random.choice(list(EYE_PRESCRIPTIONS.keys()))
         eye_rx_data = EYE_PRESCRIPTIONS.get(eye_status, EYE_PRESCRIPTIONS["Normal"])
         
         # Compute age-sensitive dermal plan
@@ -724,7 +768,8 @@ def display_dashboard(model, image_path, name="Guest", age=25, eye_data=False):
         circle = plt.Circle((0.5, 0.5), 0.4, color='#3366ff', fill=False, lw=3)
         ax2.add_artist(circle)
         ax2.text(0.5, 0.65, f"👁️ TEST: {eye_status}", ha='center', fontsize=14, fontweight='bold', color='blue')
-        ax2.text(0.5, 0.45, f"STABILITY: 99.9%", ha='center', fontsize=11)
+        ax2.text(0.5, 0.48, f"STABILITY: 99.9%", ha='center', fontsize=11)
+        ax2.text(0.5, 0.35, f"RETINA HEALTH: {retina_score}%", ha='center', fontsize=11, fontweight='bold', color='#df0000')
         ax2.set_xlim(0, 1), ax2.set_ylim(0, 1)
         ax2.axis('off')
         ax2.set_title("Ocular Scanners", fontweight='bold')
@@ -732,18 +777,23 @@ def display_dashboard(model, image_path, name="Guest", age=25, eye_data=False):
         # 3. HOLISTIC PRESCRIPTION DRAWER (Based on Age & Prediction) & PIGMENTATION HUD
         ax3 = plt.subplot(2, 2, 3)
         ax3.text(0, 0.95, "🧑‍⚕️ SKIN RECOVERY PLAN", fontsize=11, fontweight='bold', color='#df0000')
-        ax3.text(0, 0.86, f"▸ TOPICAL: {topical_rx}", fontsize=8.5, wrap=True)
-        ax3.text(0, 0.78, f"▸ RETINOL: {retinol_rx}", fontsize=8.5, color='purple', wrap=True)
-        ax3.text(0, 0.70, f"▸ AGE FOCUS: {age_focus}", fontsize=7.5, color='#555555', fontstyle='italic', wrap=True)
+        ax3.text(0, 0.88, f"▸ PRESENT SKIN HEALTH INDEX: {skin_health_score}%", fontsize=8.5, fontweight='bold', color='green')
+        ax3.text(0, 0.82, f"▸ TOPICAL: {topical_rx}", fontsize=8, wrap=True)
+        ax3.text(0, 0.76, f"▸ RETINOL: {retinol_rx}", fontsize=8, color='purple', wrap=True)
+        ax3.text(0, 0.70, f"▸ AGE FOCUS: {age_focus}", fontsize=7, color='#555555', fontstyle='italic', wrap=True)
         
-        ax3.text(0, 0.58, "🔍 PIGMENTATION ANALYTICS HUD", fontsize=11, fontweight='bold', color='#ff6600')
-        ax3.text(0, 0.49, f"▸ DENSITY: {p_density}% | COLOR: {p_color} {p_rgb}", fontsize=8.5, wrap=True)
-        ax3.text(0, 0.42, f"▸ CLASS: {p_type}", fontsize=8.5, wrap=True)
+        probs_pct = [round(float(p) * 100.0, 1) for p in all_confidences]
+        prob_breakdown = f"Healthy: {probs_pct[4]}% | Acne: {probs_pct[0]}% | Eczema: {probs_pct[1]}% | Psoriasis: {probs_pct[2]}% | Wrinkles: {probs_pct[3]}%"
+        ax3.text(0, 0.64, f"▸ BIO-DERMAL: {prob_breakdown}", fontsize=7.5, color='#333333', wrap=True)
         
-        ax3.text(0, 0.30, "👁️ VISION RECOVERY PLAN", fontsize=11, fontweight='bold', color='#0000df')
-        ax3.text(0, 0.21, f"▸ CARE: {eye_rx_data.get('CARE', 'Standard')}", fontsize=8.5, wrap=True)
-        ax3.text(0, 0.13, f"▸ FRUITS: {eye_rx_data.get('FRUITS', 'Berries')}", fontsize=8.5, color='darkgreen', wrap=True)
-        ax3.text(0, 0.05, f"▸ MEDICINE: {eye_rx_data.get('MED', 'Supplements')}", fontsize=8.5, color='darkblue', wrap=True)
+        ax3.text(0, 0.52, "🔍 PIGMENTATION ANALYTICS HUD", fontsize=11, fontweight='bold', color='#ff6600')
+        ax3.text(0, 0.45, f"▸ DENSITY: {p_density}% | COLOR: {p_color} {p_rgb}", fontsize=8, wrap=True)
+        ax3.text(0, 0.39, f"▸ CLASS: {p_type}", fontsize=8, wrap=True)
+        
+        ax3.text(0, 0.28, "👁️ VISION RECOVERY PLAN", fontsize=11, fontweight='bold', color='#0000df')
+        ax3.text(0, 0.21, f"▸ PRESENT RETINA HEALTH INDEX: {retina_score}% ({eye_status})", fontsize=8.5, fontweight='bold', color='blue')
+        ax3.text(0, 0.14, f"▸ CARE: {eye_rx_data.get('CARE', 'Standard')}", fontsize=8)
+        ax3.text(0, 0.07, f"▸ FRUITS: {eye_rx_data.get('FRUITS', 'Berries')} | MED: {eye_rx_data.get('MED', 'Supplements')}", fontsize=8)
         ax3.axis('off')
         ax3.set_title("Holistic AI Prescription & Pigmentation HUD", fontweight='bold')
         
@@ -790,7 +840,11 @@ def display_dashboard(model, image_path, name="Guest", age=25, eye_data=False):
             pigment_density=p_density,
             pigment_color=p_color,
             pigment_rgb=p_rgb,
-            pigment_type=p_type
+            pigment_type=p_type,
+            skin_health_score=skin_health_score,
+            eye_status=eye_status,
+            retina_score=retina_score,
+            probs_pct=probs_pct
         )
         
     except Exception as e:
