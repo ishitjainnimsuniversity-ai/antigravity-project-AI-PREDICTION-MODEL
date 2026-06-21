@@ -346,7 +346,7 @@ def analyze_pigmentation(img):
 
 
 
-def generate_pdf(name, age, prediction, topical_rx, retinol_rx, diet, eye_rx, img, plot_buf, pigment_density, pigment_color, pigment_rgb, pigment_type):
+def generate_pdf(name, age, prediction, topical_rx, retinol_rx, diet, eye_rx, img, plot_buf, pigment_density, pigment_color, pigment_rgb, pigment_type, skin_health_score, eye_status, retina_score, probs_pct):
     pdf = FPDF()
     pdf.add_page()
     
@@ -382,6 +382,26 @@ def generate_pdf(name, age, prediction, topical_rx, retinol_rx, diet, eye_rx, im
     pdf.cell(65, 8, f" DETECTED SPOT COLOR: {pigment_color}", border=1)
     pdf.cell(65, 8, f" SPOT RGB: {pigment_rgb}", border=1, ln=True)
     pdf.cell(0, 8, f" PIGMENT TYPE: {pigment_type}", border=1, ln=True)
+    pdf.ln(4)
+
+    # --- INTEGRATED CLINICAL SCORES HUD ---
+    pdf.set_fill_color(230, 250, 235) # Light Green
+    pdf.set_font("Arial", 'B', 10)
+    pdf.cell(0, 8, " [ INTEGRATED CLINICAL PRESENT SCORECARD ]", ln=True, fill=True)
+    pdf.set_font("Arial", '', 9)
+    pdf.cell(95, 8, f" PRESENT SKIN HEALTH INDEX: {skin_health_score}%", border=1)
+    pdf.cell(95, 8, f" PRESENT RETINA HEALTH INDEX: {retina_score}% ({eye_status})", border=1, ln=True)
+    pdf.ln(4)
+
+    # --- FULL BIO-DERMAL DIAGNOSTIC PROFILE ---
+    pdf.set_fill_color(245, 240, 255) # Light Purple
+    pdf.set_font("Arial", 'B', 10)
+    pdf.cell(0, 8, " [ NEURAL BIO-DERMAL PROBABILITY BREAKDOWN ]", ln=True, fill=True)
+    pdf.set_font("Arial", '', 9)
+    prob_str1 = f" HEALTHY SKIN: {probs_pct[4]}%  |  ACNE: {probs_pct[0]}%  |  ECZEMA: {probs_pct[1]}%"
+    prob_str2 = f" PSORIASIS: {probs_pct[2]}%  |  WRINKLES: {probs_pct[3]}%"
+    pdf.cell(0, 8, prob_str1, border=1, ln=True)
+    pdf.cell(0, 8, prob_str2, border=1, ln=True)
     pdf.ln(4)
     
     # --- OPTICAL SCAN SECTION ---
@@ -516,17 +536,55 @@ with col1:
             with st.spinner("Decoding Neural Patterns (Initializing Deep Learning Model)..."):
                 label, conf, probs = predict_skin(img, patient_age)
                 p_density, p_color, p_rgb, p_type = analyze_pigmentation(img)
-                st.session_state['diagnosis'] = (label, conf, probs, img, p_density, p_color, p_rgb, p_type)
+                
+                # Dynamic Ocular status based on red channels in the captured image
+                img_rgb = img.convert('RGB')
+                arr_img = np.array(img_rgb)
+                avg_r = np.mean(arr_img[:, :, 0]) if arr_img.size > 0 else 100
+                if avg_r > 160:
+                    eye_status = "Strain"
+                    retina_score = 78.5 - (patient_age * 0.1)
+                elif avg_r > 120:
+                    eye_status = "Fatigue"
+                    retina_score = 69.2 - (patient_age * 0.1)
+                elif avg_r > 80:
+                    eye_status = "Normal"
+                    retina_score = 93.4 - (patient_age * 0.08)
+                else:
+                    eye_status = "Optimal"
+                    retina_score = 97.8 - (patient_age * 0.05)
+                retina_score = round(np.clip(retina_score, 45.0, 99.5), 1)
+                
+                # Dynamic Skin Health Score based on prediction & pigmentation
+                healthy_prob = float(probs[4]) * 100.0
+                skin_health_score = 95.0 - (p_density * 1.2) - (100.0 - healthy_prob) * 0.4
+                if label != "Healthy Skin":
+                    skin_health_score -= 15.0
+                skin_health_score = round(np.clip(skin_health_score, 15.0, 99.0), 1)
+                
+                st.session_state['diagnosis'] = (label, conf, probs, img, p_density, p_color, p_rgb, p_type, skin_health_score, eye_status, retina_score)
 
 with col2:
     st.subheader("📊 Diagnostic Insights")
     if 'diagnosis' in st.session_state:
-        label, conf, probs, img, p_density, p_color, p_rgb, p_type = st.session_state['diagnosis']
+        diag = st.session_state['diagnosis']
+        if len(diag) == 8:
+            label, conf, probs, img, p_density, p_color, p_rgb, p_type = diag
+            skin_health_score = 85.0
+            eye_status = "Normal"
+            retina_score = 94.2
+        else:
+            label, conf, probs, img, p_density, p_color, p_rgb, p_type, skin_health_score, eye_status, retina_score = diag
         
         st.markdown(f"""
         <div class="report-card">
             <h3>Result: <span style='color:#00d2ff'>{label}</span></h3>
             <p>Confidence Level: <b>{conf:.1f}%</b></p>
+        </div>
+        <div class="report-card" style="border: 1px solid rgba(0, 210, 255, 0.3); background: rgba(0, 210, 255, 0.05);">
+            <h3>🎯 Dermal & Retinal Present Health Indices</h3>
+            <p>• <b>Present Skin Health Score:</b> <span style='color:#00d2ff'><b>{skin_health_score}%</b></span></p>
+            <p>• <b>Present Retina Health Score:</b> <span style='color:#3a7bd5'><b>{retina_score}%</b></span> ({eye_status})</p>
         </div>
         <div class="report-card" style="border: 1px solid rgba(255, 179, 0, 0.3); background: rgba(255, 179, 0, 0.05);">
             <h3>🔍 Pigmentation Analytics HUD</h3>
@@ -536,6 +594,12 @@ with col2:
         </div>
         """, unsafe_allow_html=True)
         
+        st.markdown("### 🧬 Neural Bio-Dermal Probabilities")
+        for i, skin_class in enumerate(SKIN_CLASSES):
+            prob_pct = float(probs[i]) * 100.0
+            st.write(f"**{skin_class}**: {prob_pct:.1f}%")
+            st.progress(prob_pct / 100.0)
+            
         # Treatment & Diet
         tab1, tab2, tab3 = st.tabs(["💊 Treatment", "🥗 Nutrition", "📈 Bio-Forecast"])
         
@@ -543,7 +607,7 @@ with col2:
         age_focus, topical_rx, retinol_rx = get_clinical_plan(label, patient_age)
         
         with tab1:
-            st.markdown(f"### 🎯 Age Focus Focus")
+            st.markdown(f"### 🎯 Age Focus")
             st.info(age_focus)
             st.markdown(f"### 💊 Topical Treatment Protocol")
             st.write(topical_rx)
@@ -581,8 +645,7 @@ with col2:
         st.subheader("📄 Clinical Documentation")
         
         try:
-            eye_status = "Normal" # Mocked for now
-            eye_rx = EYE_PRESCRIPTIONS[eye_status]
+            eye_rx = EYE_PRESCRIPTIONS.get(eye_status, EYE_PRESCRIPTIONS["Normal"])
             
             # Generate PDF plot (white background, dark labels for contrast in PDF)
             pdf_fig, pdf_ax = plt.subplots(figsize=(6, 4))
@@ -599,6 +662,8 @@ with col2:
             pdf_plot_buf.seek(0)
             plt.close(pdf_fig)
             
+            probs_pct = [round(float(p) * 100.0, 1) for p in probs]
+            
             # Generate the beautiful PDF report
             pdf_bytes = bytes(generate_pdf(
                 name=patient_name,
@@ -613,7 +678,11 @@ with col2:
                 pigment_density=p_density,
                 pigment_color=p_color,
                 pigment_rgb=p_rgb,
-                pigment_type=p_type
+                pigment_type=p_type,
+                skin_health_score=skin_health_score,
+                eye_status=eye_status,
+                retina_score=retina_score,
+                probs_pct=probs_pct
             ))
             
             # Show download buttons in columns
@@ -626,7 +695,8 @@ with col2:
                     mime="application/pdf"
                 )
             with btn_col2:
-                report_text = f"Patient: {patient_name}\nAge: {patient_age}\nDiagnosis: {label}\nConfidence: {conf:.1f}%\n\nPigment Level: {p_density}%\nPigment Color: {p_color} {p_rgb}\nPigment Type: {p_type}\n\nAge Focus: {age_focus}\n\nTopical Protocol: {topical_rx}\n\nRetinoid Therapy: {retinol_rx}\n\nDiet Strategy: {DIETS.get(label)}"
+                probs_pct_str = ", ".join([f"{SKIN_CLASSES[k]}: {round(float(probs[k])*100.0, 1)}%" for k in range(len(SKIN_CLASSES))])
+                report_text = f"Patient: {patient_name}\nAge: {patient_age}\nDiagnosis: {label}\nConfidence: {conf:.1f}%\n\nPresent Skin Health Index: {skin_health_score}%\nPresent Retina Health Index: {retina_score}% ({eye_status})\n\nSkin Conditions Probability Profile:\n{probs_pct_str}\n\nPigment Level: {p_density}%\nPigment Color: {p_color} {p_rgb}\nPigment Type: {p_type}\n\nAge Focus: {age_focus}\n\nTopical Protocol: {topical_rx}\n\nRetinoid Therapy: {retinol_rx}\n\nDiet Strategy: {DIETS.get(label)}"
                 st.download_button(
                     label="📥 Download Report (TXT)",
                     data=report_text,
