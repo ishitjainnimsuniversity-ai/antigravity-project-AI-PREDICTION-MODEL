@@ -646,6 +646,50 @@ def compute_skin_mask(arr):
     return R, G, B, skin_mask
 
 
+def generate_pseudo_thermal_map(img, skin_mask):
+    """
+    Generates a pseudo-thermal map of skin areas indicating:
+    - Vascular activity/inflammation (represented by redness a* channel in Lab space)
+    - Sebum/lipid density (represented by specular highlight L* channel)
+    """
+    if cv2 is None:
+        return img # Fallback if cv2 is not available
+
+    try:
+        img_np = np.array(img.convert('RGB'))
+        img_bgr = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
+        img_lab = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2LAB)
+        L = img_lab[:, :, 0].astype(np.float32)
+        a = img_lab[:, :, 1].astype(np.float32)
+        
+        # Redness (a* channel) intensity mapped to active warmth
+        red_intensity = np.clip(a - 128.0, 0, 127)
+        # Specular highlights (high lightness L*) mapped to sebum/heat concentration
+        specular_intensity = np.clip(L - 100.0, 0, 155)
+        
+        # Combine maps: red_intensity contributes heavily to red/orange, specular highlights to white/yellow
+        heat = (red_intensity * 3.5) + (specular_intensity * 0.8)
+        heat = np.clip(heat, 0, 255).astype(np.uint8)
+        
+        # Apply slight Gaussian blur to smooth the thermal transitions
+        heat_smooth = cv2.GaussianBlur(heat, (15, 15), 0)
+        thermal_bgr = cv2.applyColorMap(heat_smooth, cv2.COLORMAP_JET)
+        
+        # Deep dark clinical blue background for non-skin regions [B, G, R]
+        background_color = np.array([35, 15, 10], dtype=np.uint8)
+        
+        # Smoothly blend the mask edge
+        mask_uint8 = (skin_mask * 255).astype(np.uint8)
+        mask_blur = cv2.GaussianBlur(mask_uint8, (5, 5), 0) / 255.0
+        mask_blur = np.expand_dims(mask_blur, axis=2)
+        
+        final_bgr = (thermal_bgr * mask_blur + background_color * (1.0 - mask_blur)).astype(np.uint8)
+        final_rgb = cv2.cvtColor(final_bgr, cv2.COLOR_BGR2RGB)
+        return Image.fromarray(final_rgb)
+    except Exception:
+        return img
+
+
 def full_dermatological_analysis(img):
     """
     Master clinical analysis function.
@@ -658,6 +702,7 @@ def full_dermatological_analysis(img):
     # 1. MediaPipe Face Mesh ROI segmentation (skin-only, stripping hair, eyes, background)
     # Falls back to standard HSV/RGB skin tone color thresholding
     skin_mask, is_mediapipe = get_mediapipe_skin_mask(img)
+    thermal_img = generate_pseudo_thermal_map(img, skin_mask)
 
     R = arr[:, :, 0].astype(np.float32)
     G = arr[:, :, 1].astype(np.float32)
@@ -782,6 +827,7 @@ def full_dermatological_analysis(img):
         "barrier_score": barrier_score, "uv_damage_score": uv_damage_score,
         # ROI status
         "is_mediapipe": is_mediapipe,
+        "thermal_img": thermal_img,
         # Texture (GLCM + LBP)
         "glcm_contrast": round(glcm_contrast, 3),
         "glcm_homogeneity": round(glcm_homogeneity, 3),
@@ -1083,7 +1129,7 @@ def sanitize_text(text):
 
 def generate_clinical_pdf(name, age, prediction, clinical_data, age_focus,
                            topical_rx, prescription_rx, procedure_rx, lifestyle_rx,
-                           diet_plan, eye_rx, img, plot_buf,
+                           diet_plan, eye_rx, img, thermal_img, plot_buf,
                            skin_health_score, eye_status, retina_score,
                            probs, iga_score, glogau_score):
     # Sanitize all string inputs to prevent FPDF font encoding errors
@@ -1157,28 +1203,38 @@ def generate_clinical_pdf(name, age, prediction, clinical_data, age_focus,
     pdf.cell(95, 7, f" RETINA HEALTH INDEX: {retina_score}% ({eye_status})", border=1, ln=1)
     pdf.ln(3)
 
-    # VISUALS (face + plot) - PLACED PROMINENTLY ON PAGE 1
+    # VISUALS (face + thermal + plot) - PLACED PROMINENTLY ON PAGE 1
     pdf.set_fill_color(230, 230, 250)
     pdf.set_font("Arial", 'B', 9)
-    pdf.cell(0, 7, " [ SCAN IMAGE & 10-YEAR BIO-STABILITY PROJECTION ]", ln=1, fill=True)
+    pdf.cell(0, 7, " [ BASELINE SCAN, DIAGNOSTIC THERMAL PROFILE & 10-YEAR PROJECTION ]", ln=1, fill=True)
     pdf.ln(2)
     y_vis = pdf.get_y()
     
     import uuid
     unique_id = uuid.uuid4().hex
     temp_img_path = f"temp_web_image_{unique_id}.jpg"
+    temp_thermal_path = f"temp_thermal_{unique_id}.png"
     temp_plot_path = f"temp_plot_{unique_id}.png"
     try:
         img.save(temp_img_path)
+        if thermal_img is not None:
+            thermal_img.save(temp_thermal_path)
         with open(temp_plot_path, "wb") as f:
             f.write(plot_buf.getvalue())
-        # Draw images with bounded width and height to prevent page overflow
-        pdf.image(temp_img_path, x=12, y=y_vis, w=88, h=55)
-        pdf.image(temp_plot_path, x=108, y=y_vis, w=88, h=55)
+        # Draw three images side-by-side (58 mm width, 42 mm height each)
+        pdf.image(temp_img_path, x=12, y=y_vis, w=58, h=42)
+        if thermal_img is not None:
+            pdf.image(temp_thermal_path, x=76, y=y_vis, w=58, h=42)
+        pdf.image(temp_plot_path, x=140, y=y_vis, w=58, h=42)
     finally:
         try:
             if os.path.exists(temp_img_path):
                 os.remove(temp_img_path)
+        except Exception:
+            pass
+        try:
+            if os.path.exists(temp_thermal_path):
+                os.remove(temp_thermal_path)
         except Exception:
             pass
         try:
@@ -1187,8 +1243,8 @@ def generate_clinical_pdf(name, age, prediction, clinical_data, age_focus,
         except Exception:
             pass
     
-    # Move cursor past the images
-    pdf.set_y(y_vis + 57)
+    # Move cursor past the images (y_vis + height 42 + spacing 2)
+    pdf.set_y(y_vis + 44)
     pdf.ln(3)
 
     # COLORIMETRY HUD (CIELab)
@@ -1509,6 +1565,18 @@ with col1:
             except Exception:
                 pass
 
+            # Show Pseudo-Thermal Skin Map
+            if "thermal_img" in cd_store:
+                st.markdown("---")
+                st.markdown("🌡️ **Diagnostic Pseudo-Thermal Skin Activity Map**")
+                st.image(cd_store["thermal_img"], caption="Pseudo-Thermal Map (Inflammation & Sebum Distribution)", use_container_width=True)
+                st.info("""
+                **Thermal Profile Indicator Legend**:
+                - 🔴/🟠 **Red / Orange**: Elevated vascular perfusion, active inflammatory/erythemic zones.
+                - ⚪/🟡 **White / Yellow**: High specular sebum/oiliness distribution.
+                - 🔵/🟢 **Blue / Green**: Cool thermal baseline (normal/quiescent skin).
+                """)
+
 with col2:
     st.subheader("📊 Clinical Diagnostic Insights")
 
@@ -1781,7 +1849,7 @@ with col2:
                 topical_rx=topical_rx, prescription_rx=prescription_rx,
                 procedure_rx=procedure_rx, lifestyle_rx=lifestyle_rx,
                 diet_plan=dynamic_diet, eye_rx=eye_rx_data,
-                img=img, plot_buf=pdf_plot_buf,
+                img=img, thermal_img=cd.get("thermal_img", None), plot_buf=pdf_plot_buf,
                 skin_health_score=shs, eye_status=es, retina_score=rs,
                 probs=probs, iga_score=iga, glogau_score=glogau
             ))
