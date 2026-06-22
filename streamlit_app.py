@@ -452,6 +452,8 @@ def get_mediapipe_skin_mask(img):
     except Exception:
         pass
 
+    return fallback_mask, False
+
 
 def rgb_to_lab(R, G, B):
 
