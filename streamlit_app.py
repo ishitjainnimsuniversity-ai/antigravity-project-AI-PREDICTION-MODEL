@@ -692,6 +692,225 @@ def generate_pseudo_thermal_map(img, skin_mask):
         return img
 
 
+def generate_uv_woods_lamp_scan(img, skin_mask):
+    """
+    Simulates a Wood's lamp (UV) clinical examination.
+    - Standard skin turns deep violet/indigo.
+    - Sun-damage (melanin pockets) appears as dark patches.
+    - Bacterial porphyrins (acne precursors) fluoresce as glowing neon-green spots.
+    """
+    if cv2 is None:
+        return img
+
+    try:
+        img_np = np.array(img.convert('RGB'))
+        img_bgr = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
+        gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
+        
+        # High-contrast gray representing melanin absorption (inverted/high contrast)
+        uv_base = cv2.equalizeHist(gray)
+        
+        # Create dark indigo/violet color map (B, G, R)
+        indigo_skin = np.zeros_like(img_bgr)
+        indigo_skin[:, :, 0] = (uv_base * 0.45).astype(np.uint8) # Blue
+        indigo_skin[:, :, 1] = (uv_base * 0.10).astype(np.uint8) # Green
+        indigo_skin[:, :, 2] = (uv_base * 0.25).astype(np.uint8) # Red (creating violet)
+        
+        # Extract porphyrins (acne bacteria precursors) which fluoresce bright green under UV
+        R_chan = img_bgr[:, :, 2].astype(np.float32)
+        G_chan = img_bgr[:, :, 1].astype(np.float32)
+        B_chan = img_bgr[:, :, 0].astype(np.float32)
+        
+        # Bacteria threshold: areas where red is higher than green and blue (inflammation)
+        bact_metric = (R_chan - G_chan) + (R_chan - B_chan)
+        bact_metric = np.clip(bact_metric, 0, 255).astype(np.uint8)
+        
+        _, bact_mask = cv2.threshold(bact_metric, 35, 255, cv2.THRESH_BINARY)
+        # Apply Gaussian blur to porphyrin spots to simulate light glowing
+        bact_glow = cv2.GaussianBlur(bact_mask, (9, 9), 0)
+        
+        # Blend bacteria spots into neon green (B=50, G=255, R=50)
+        indigo_skin[bact_glow > 10, 0] = 50
+        indigo_skin[bact_glow > 10, 1] = 255
+        indigo_skin[bact_glow > 10, 2] = 50
+        
+        # Cleanly mask out background/eyes/hair with deep black
+        background_color = np.array([20, 10, 15], dtype=np.uint8)
+        
+        mask_uint8 = (skin_mask * 255).astype(np.uint8)
+        mask_blur = cv2.GaussianBlur(mask_uint8, (5, 5), 0) / 255.0
+        mask_blur = np.expand_dims(mask_blur, axis=2)
+        
+        final_bgr = (indigo_skin * mask_blur + background_color * (1.0 - mask_blur)).astype(np.uint8)
+        final_rgb = cv2.cvtColor(final_bgr, cv2.COLOR_BGR2RGB)
+        return Image.fromarray(final_rgb)
+    except Exception:
+        return img
+
+
+def simulate_skin_progression(img, skin_mask, year, is_optimized):
+    """
+    Simulates skin aging (Unmanaged) or skin rejuvenation/maintenance (Optimized)
+    over a 1-10 year period.
+    """
+    if year == 0:
+        return img
+
+    try:
+        img_np = np.array(img.convert('RGB')).astype(np.float32)
+        
+        if is_optimized:
+            # Rejuvenation / Maintenance: smoothing & slight brightening
+            if cv2 is not None:
+                blur = cv2.GaussianBlur(img_np, (5, 5), 0)
+                # blend: 2% smoothing per year, up to 20%
+                alpha = min(year * 0.02, 0.20)
+                aged_np = img_np * (1.0 - alpha) + blur * alpha
+                # Slight brightness increase in skin area
+                aged_np[skin_mask] = np.clip(aged_np[skin_mask] * (1.0 + min(year * 0.005, 0.05)), 0, 255)
+            else:
+                aged_np = img_np
+        else:
+            # Aging: enhance wrinkles & add photoaging spots
+            if cv2 is not None:
+                gray = cv2.cvtColor(img_np.astype(np.uint8), cv2.COLOR_RGB2GRAY)
+                edges = cv2.Laplacian(gray, cv2.CV_64F, ksize=3)
+                edges = np.abs(edges)
+                edges = np.clip(edges, 0, 255)
+                # Dilate edges to make wrinkles look thicker/deeper
+                kernel = np.ones((2, 2), np.uint8)
+                edges_dilated = cv2.dilate(edges.astype(np.uint8), kernel, iterations=1)
+                
+                # Blend edges as dark lines (wrinkles) on the skin
+                blend_factor = min(year * 0.04, 0.40)
+                aged_np = img_np.copy()
+                
+                # Darken pixels where edges are strong in skin area
+                mask_pixels = skin_mask & (edges_dilated > 30)
+                aged_np[mask_pixels] = aged_np[mask_pixels] * (1.0 - blend_factor)
+                
+                # Slightly yellow/darken the skin to simulate UV spots (photoaging)
+                uv_darken = min(year * 0.015, 0.15)
+                aged_np[skin_mask, 2] = aged_np[skin_mask, 2] * (1.0 - uv_darken) # Reduce blue
+                aged_np[skin_mask, 1] = aged_np[skin_mask, 1] * (1.0 - uv_darken * 0.5) # Reduce green
+            else:
+                aged_np = img_np
+                
+        aged_np = np.clip(aged_np, 0, 255).astype(np.uint8)
+        return Image.fromarray(aged_np)
+    except Exception:
+        return img
+
+
+def generate_diagnostic_mesh_plot(img):
+    """
+    Superimposes a glowing neon schematic face mesh over the face image.
+    Annotates localized diagnostic sites.
+    """
+    if mp is None or cv2 is None:
+        return None
+
+    try:
+        img_rgb = np.array(img.convert('RGB'))
+        h, w, c = img_rgb.shape
+        
+        detector = get_face_landmarker_detector()
+        landmarks = None
+        
+        if detector is not None:
+            try:
+                mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=img_rgb)
+                res = detector.detect(mp_image)
+                if res.face_landmarks:
+                    landmarks = res.face_landmarks[0]
+            except Exception:
+                pass
+                
+        if landmarks is None:
+            try:
+                if hasattr(mp, 'solutions') and hasattr(mp.solutions, 'face_mesh'):
+                    mp_face_mesh = mp.solutions.face_mesh
+                    with mp_face_mesh.FaceMesh(
+                        static_image_mode=True,
+                        max_num_faces=1,
+                        refine_landmarks=True,
+                        min_detection_confidence=0.3
+                    ) as face_mesh:
+                        results = face_mesh.process(img_rgb)
+                        if results.multi_face_landmarks:
+                            landmarks = results.multi_face_landmarks[0].landmark
+            except Exception:
+                pass
+                
+        if landmarks is None:
+            return None # No face detected
+
+        fig, ax = plt.subplots(figsize=(6, 5), facecolor='#0a0a1a')
+        ax.imshow(img_rgb)
+        
+        def get_pt(idx):
+            pt = landmarks[idx]
+            return int(pt.x * w), int(pt.y * h)
+
+        contours = [
+            # Oval boundary
+            [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378,
+             400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21,
+             54, 103, 67, 109, 10],
+            # Nose bridge
+            [168, 6, 197, 195, 5, 4, 1, 19, 94],
+            # Left eyebrow
+            [70, 63, 105, 66, 107],
+            # Right eyebrow
+            [300, 293, 334, 296, 336],
+            # Left eye
+            [33, 160, 158, 133, 153, 144, 33],
+            # Right eye
+            [362, 385, 387, 263, 373, 380, 362],
+            # Outer lips
+            [78, 95, 88, 178, 87, 14, 317, 402, 318, 324, 308, 78]
+        ]
+        
+        for loop in contours:
+            pts = [get_pt(idx) for idx in loop]
+            xs, ys = zip(*pts)
+            ax.plot(xs, ys, color='#00d2ff', alpha=0.8, linewidth=1.2)
+            ax.plot(xs, ys, color='#00d2ff', alpha=0.3, linewidth=3.0)
+
+        # Plot major diagnostic anchors with labels
+        fx, fy = get_pt(10)
+        ax.plot(fx, fy, 'o', color='#ff007f', markersize=8, markeredgecolor='white', markeredgewidth=1.5)
+        ax.text(fx, fy - 15, "FOREHEAD\n[Texture/Wrinkle]", color='white', fontsize=7, fontweight='bold',
+                ha='center', va='bottom', bbox=dict(facecolor='#0d1b2a', edgecolor='#ff007f', alpha=0.85, boxstyle='round,pad=0.3'))
+        
+        nx, ny = get_pt(4)
+        ax.plot(nx, ny, 'o', color='#00ff88', markersize=8, markeredgecolor='white', markeredgewidth=1.5)
+        ax.text(nx, ny - 15, "T-ZONE\n[Sebum Focus]", color='white', fontsize=7, fontweight='bold',
+                ha='center', va='bottom', bbox=dict(facecolor='#0d1b2a', edgecolor='#00ff88', alpha=0.85, boxstyle='round,pad=0.3'))
+        
+        lcx, lcy = get_pt(234)
+        ax.plot(lcx, lcy, 'o', color='#ffd93d', markersize=8, markeredgecolor='white', markeredgewidth=1.5)
+        ax.text(lcx - 15, lcy, "LEFT CHEEK\n[Erythema Index]", color='white', fontsize=7, fontweight='bold',
+                ha='right', va='center', bbox=dict(facecolor='#0d1b2a', edgecolor='#ffd93d', alpha=0.85, boxstyle='round,pad=0.3'))
+        
+        rcx, rcy = get_pt(454)
+        ax.plot(rcx, rcy, 'o', color='#ffd93d', markersize=8, markeredgecolor='white', markeredgewidth=1.5)
+        ax.text(rcx + 15, rcy, "RIGHT CHEEK\n[GLCM Contrast]", color='white', fontsize=7, fontweight='bold',
+                ha='left', va='center', bbox=dict(facecolor='#0d1b2a', edgecolor='#ffd93d', alpha=0.85, boxstyle='round,pad=0.3'))
+        
+        cx, cy = get_pt(152)
+        ax.plot(cx, cy, 'o', color='#00d2ff', markersize=8, markeredgecolor='white', markeredgewidth=1.5)
+        ax.text(cx, cy + 15, "CHIN\n[Pore Density]", color='white', fontsize=7, fontweight='bold',
+                ha='center', va='top', bbox=dict(facecolor='#0d1b2a', edgecolor='#00d2ff', alpha=0.85, boxstyle='round,pad=0.3'))
+
+        ax.axis('off')
+        fig.subplots_adjust(left=0, right=1, bottom=0, top=1)
+        plt.close(fig)
+        return fig
+    except Exception:
+        return None
+
+
 def full_dermatological_analysis(img):
     """
     Master clinical analysis function.
@@ -705,6 +924,7 @@ def full_dermatological_analysis(img):
     # Falls back to standard HSV/RGB skin tone color thresholding
     skin_mask, is_mediapipe = get_mediapipe_skin_mask(img)
     thermal_img = generate_pseudo_thermal_map(img, skin_mask)
+    uv_img = generate_uv_woods_lamp_scan(img, skin_mask)
 
     R = arr[:, :, 0].astype(np.float32)
     G = arr[:, :, 1].astype(np.float32)
@@ -830,6 +1050,7 @@ def full_dermatological_analysis(img):
         # ROI status
         "is_mediapipe": is_mediapipe,
         "thermal_img": thermal_img,
+        "uv_img": uv_img,
         # Texture (GLCM + LBP)
         "glcm_contrast": round(glcm_contrast, 3),
         "glcm_homogeneity": round(glcm_homogeneity, 3),
@@ -1131,9 +1352,9 @@ def sanitize_text(text):
 
 def generate_clinical_pdf(name, age, prediction, clinical_data, age_focus,
                            topical_rx, prescription_rx, procedure_rx, lifestyle_rx,
-                           diet_plan, eye_rx, img, thermal_img, plot_buf,
+                           diet_plan, eye_rx, img, thermal_img, uv_img, plot_buf,
                            skin_health_score, eye_status, retina_score,
-                           probs, iga_score, glogau_score):
+                           probs, iga_score, glogau_score, theme="Clinical Lab Blue"):
     # Sanitize all string inputs to prevent FPDF font encoding errors
     name = sanitize_text(name)
     prediction = sanitize_text(prediction)
@@ -1165,22 +1386,69 @@ def generate_clinical_pdf(name, age, prediction, clinical_data, age_focus,
     # ==========================================
     pdf.add_page()
 
+    # Configure theme colors [R, G, B] for headers
+    if theme == "Dark Cyberpunk":
+        bg_profile = (30, 20, 45)      # Deep purple
+        bg_scorecard = (20, 45, 40)    # Deep teal
+        bg_visuals = (45, 15, 30)      # Deep pink
+        bg_colorimetry = (45, 45, 20)  # Deep yellow/gold
+        bg_severity = (45, 20, 20)     # Deep red
+        bg_pigment = (25, 20, 45)      # Deep violet
+        text_color = (255, 255, 255)
+        heading_color = (255, 0, 128)  # Neon Pink
+    elif theme == "Apothecary Earth":
+        bg_profile = (225, 220, 205)   # Light cream/beige
+        bg_scorecard = (215, 225, 205) # Light sage
+        bg_visuals = (225, 215, 205)   # Light clay/sand
+        bg_colorimetry = (230, 225, 210)# Soft canvas
+        bg_severity = (230, 215, 215)  # Soft terracotta
+        bg_pigment = (220, 220, 225)   # Soft stone
+        text_color = (40, 35, 30)       # Dark charcoal/brown
+        heading_color = (60, 70, 50)    # Olive
+    else:
+        # Default Clinical
+        bg_profile = (220, 235, 255)
+        bg_scorecard = (220, 255, 230)
+        bg_visuals = (230, 230, 250)
+        bg_colorimetry = (255, 245, 210)
+        bg_severity = (255, 235, 235)
+        bg_pigment = (240, 240, 255)
+        text_color = (0, 0, 0)
+        heading_color = (8, 15, 50)
+
     # HEADER
-    pdf.set_fill_color(8, 15, 50)
-    pdf.rect(0, 0, 210, 36, 'F')
-    pdf.set_text_color(0, 210, 255)
-    pdf.set_font("Arial", 'B', 18)
-    pdf.cell(0, 14, " VISION-AI | CLINICAL DERMATOLOGY REPORT", ln=1, align='C')
-    pdf.set_font("Arial", 'I', 8)
-    pdf.set_text_color(200, 220, 255)
+    if theme == "Dark Cyberpunk":
+        pdf.set_fill_color(15, 10, 25)
+        pdf.rect(0, 0, 210, 36, 'F')
+        pdf.set_text_color(255, 0, 128)
+        pdf.set_font("Arial", 'B', 18)
+        pdf.cell(0, 14, " VISION-AI | CLINICAL DERMATOLOGY REPORT", ln=1, align='C')
+        pdf.set_font("Arial", 'I', 8)
+        pdf.set_text_color(0, 255, 240)
+    elif theme == "Apothecary Earth":
+        pdf.set_fill_color(60, 70, 50)
+        pdf.rect(0, 0, 210, 36, 'F')
+        pdf.set_text_color(235, 225, 205)
+        pdf.set_font("Arial", 'B', 18)
+        pdf.cell(0, 14, " VISION-AI | CLINICAL DERMATOLOGY REPORT", ln=1, align='C')
+        pdf.set_font("Arial", 'I', 8)
+        pdf.set_text_color(190, 140, 100)
+    else:
+        pdf.set_fill_color(8, 15, 50)
+        pdf.rect(0, 0, 210, 36, 'F')
+        pdf.set_text_color(0, 210, 255)
+        pdf.set_font("Arial", 'B', 18)
+        pdf.cell(0, 14, " VISION-AI | CLINICAL DERMATOLOGY REPORT", ln=1, align='C')
+        pdf.set_font("Arial", 'I', 8)
+        pdf.set_text_color(200, 220, 255)
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     pdf.cell(0, 5, f"ENCRYPTED CLINICAL ANALYSIS | SESSION: {timestamp} | AES-256 SECURED", ln=1, align='C')
     pdf.cell(0, 5, "FOR CLINICAL REFERENCE ONLY - CONSULT A DERMATOLOGIST FOR MEDICAL DECISIONS", ln=1, align='C')
     pdf.ln(8)
 
     # PATIENT PROFILE
-    pdf.set_text_color(0, 0, 0)
-    pdf.set_fill_color(220, 235, 255)
+    pdf.set_text_color(*text_color)
+    pdf.set_fill_color(*bg_profile)
     pdf.set_font("Arial", 'B', 9)
     pdf.cell(0, 7, " [ PATIENT BIO-PROFILE ]", ln=1, fill=True)
     pdf.set_font("Arial", '', 8.5)
@@ -1197,7 +1465,7 @@ def generate_clinical_pdf(name, age, prediction, clinical_data, age_focus,
     pdf.ln(3)
 
     # INTEGRATED HEALTH SCORECARD
-    pdf.set_fill_color(220, 255, 230)
+    pdf.set_fill_color(*bg_scorecard)
     pdf.set_font("Arial", 'B', 9)
     pdf.cell(0, 7, " [ INTEGRATED CLINICAL HEALTH SCORECARD ]", ln=1, fill=True)
     pdf.set_font("Arial", '', 8.5)
@@ -1205,10 +1473,10 @@ def generate_clinical_pdf(name, age, prediction, clinical_data, age_focus,
     pdf.cell(95, 7, f" RETINA HEALTH INDEX: {retina_score}% ({eye_status})", border=1, ln=1)
     pdf.ln(3)
 
-    # VISUALS (face + thermal + plot) - PLACED PROMINENTLY ON PAGE 1
-    pdf.set_fill_color(230, 230, 250)
+    # VISUALS (2x2 grid: face, thermal, uv, plot) - PLACED PROMINENTLY ON PAGE 1
+    pdf.set_fill_color(*bg_visuals)
     pdf.set_font("Arial", 'B', 9)
-    pdf.cell(0, 7, " [ BASELINE SCAN, DIAGNOSTIC THERMAL PROFILE & 10-YEAR PROJECTION ]", ln=1, fill=True)
+    pdf.cell(0, 7, " [ BASELINE SCAN, THERMAL PROFILE, UV DAMAGE & 10-YEAR PROJECTION ]", ln=1, fill=True)
     pdf.ln(2)
     y_vis = pdf.get_y()
     
@@ -1216,41 +1484,37 @@ def generate_clinical_pdf(name, age, prediction, clinical_data, age_focus,
     unique_id = uuid.uuid4().hex
     temp_img_path = f"temp_web_image_{unique_id}.jpg"
     temp_thermal_path = f"temp_thermal_{unique_id}.png"
+    temp_uv_path = f"temp_uv_{unique_id}.png"
     temp_plot_path = f"temp_plot_{unique_id}.png"
     try:
         img.save(temp_img_path)
         if thermal_img is not None:
             thermal_img.save(temp_thermal_path)
+        if uv_img is not None:
+            uv_img.save(temp_uv_path)
         with open(temp_plot_path, "wb") as f:
             f.write(plot_buf.getvalue())
-        # Draw three images side-by-side (58 mm width, 42 mm height each)
-        pdf.image(temp_img_path, x=12, y=y_vis, w=58, h=42)
+        # Draw 2x2 visuals grid (each image w=88, h=36)
+        pdf.image(temp_img_path, x=12, y=y_vis, w=88, h=36)
         if thermal_img is not None:
-            pdf.image(temp_thermal_path, x=76, y=y_vis, w=58, h=42)
-        pdf.image(temp_plot_path, x=140, y=y_vis, w=58, h=42)
+            pdf.image(temp_thermal_path, x=108, y=y_vis, w=88, h=36)
+        if uv_img is not None:
+            pdf.image(temp_uv_path, x=12, y=y_vis + 39, w=88, h=36)
+        pdf.image(temp_plot_path, x=108, y=y_vis + 39, w=88, h=36)
     finally:
-        try:
-            if os.path.exists(temp_img_path):
-                os.remove(temp_img_path)
-        except Exception:
-            pass
-        try:
-            if os.path.exists(temp_thermal_path):
-                os.remove(temp_thermal_path)
-        except Exception:
-            pass
-        try:
-            if os.path.exists(temp_plot_path):
-                os.remove(temp_plot_path)
-        except Exception:
-            pass
+        for p in [temp_img_path, temp_thermal_path, temp_uv_path, temp_plot_path]:
+            try:
+                if os.path.exists(p):
+                    os.remove(p)
+            except Exception:
+                pass
     
-    # Move cursor past the images (y_vis + height 42 + spacing 2)
-    pdf.set_y(y_vis + 44)
+    # Move cursor past the 2x2 grid (y_vis + 2 rows of 36 + 3 mm gap + 3 mm buffer)
+    pdf.set_y(y_vis + 78)
     pdf.ln(3)
 
     # COLORIMETRY HUD (CIELab)
-    pdf.set_fill_color(255, 245, 210)
+    pdf.set_fill_color(*bg_colorimetry)
     pdf.set_font("Arial", 'B', 9)
     pdf.cell(0, 7, " [ CIELab COLORIMETRY ANALYSIS (Mexameter-Grade) ]", ln=1, fill=True)
     pdf.set_font("Arial", '', 8.5)
@@ -1263,7 +1527,7 @@ def generate_clinical_pdf(name, age, prediction, clinical_data, age_focus,
     pdf.ln(3)
 
     # CLINICAL SEVERITY SCORES
-    pdf.set_fill_color(255, 235, 235)
+    pdf.set_fill_color(*bg_severity)
     pdf.set_font("Arial", 'B', 9)
     pdf.cell(0, 7, " [ VALIDATED CLINICAL SEVERITY SCORES ]", ln=1, fill=True)
     pdf.set_font("Arial", '', 8.5)
@@ -1276,7 +1540,7 @@ def generate_clinical_pdf(name, age, prediction, clinical_data, age_focus,
     pdf.ln(3)
 
     # PIGMENTATION
-    pdf.set_fill_color(240, 240, 255)
+    pdf.set_fill_color(*bg_pigment)
     pdf.set_font("Arial", 'B', 9)
     pdf.cell(0, 7, " [ PIGMENTATION ANALYTICS ]", ln=1, fill=True)
     pdf.set_font("Arial", '', 8.5)
@@ -1297,19 +1561,37 @@ def generate_clinical_pdf(name, age, prediction, clinical_data, age_focus,
     pdf.add_page()
 
     # PAGE 2 HEADER
-    pdf.set_fill_color(8, 15, 50)
-    pdf.rect(0, 0, 210, 25, 'F')
-    pdf.set_text_color(0, 210, 255)
-    pdf.set_font("Arial", 'B', 13)
-    pdf.cell(0, 9, " VISION-AI | CLINICAL DIAGNOSTIC INSIGHTS", ln=1, align='C')
-    pdf.set_font("Arial", 'I', 7.5)
-    pdf.set_text_color(200, 220, 255)
+    if theme == "Dark Cyberpunk":
+        pdf.set_fill_color(15, 10, 25)
+        pdf.rect(0, 0, 210, 25, 'F')
+        pdf.set_text_color(255, 0, 128)
+        pdf.set_font("Arial", 'B', 13)
+        pdf.cell(0, 9, " VISION-AI | CLINICAL DIAGNOSTIC INSIGHTS", ln=1, align='C')
+        pdf.set_font("Arial", 'I', 7.5)
+        pdf.set_text_color(0, 255, 240)
+    elif theme == "Apothecary Earth":
+        pdf.set_fill_color(60, 70, 50)
+        pdf.rect(0, 0, 210, 25, 'F')
+        pdf.set_text_color(235, 225, 205)
+        pdf.set_font("Arial", 'B', 13)
+        pdf.cell(0, 9, " VISION-AI | CLINICAL DIAGNOSTIC INSIGHTS", ln=1, align='C')
+        pdf.set_font("Arial", 'I', 7.5)
+        pdf.set_text_color(190, 140, 100)
+    else:
+        # Default Clinical
+        pdf.set_fill_color(8, 15, 50)
+        pdf.rect(0, 0, 210, 25, 'F')
+        pdf.set_text_color(0, 210, 255)
+        pdf.set_font("Arial", 'B', 13)
+        pdf.cell(0, 9, " VISION-AI | CLINICAL DIAGNOSTIC INSIGHTS", ln=1, align='C')
+        pdf.set_font("Arial", 'I', 7.5)
+        pdf.set_text_color(200, 220, 255)
     pdf.cell(0, 4, f"PATIENT: {name.upper()} | CLINICAL RECOVERY PROTOCOLS & DEEP BIOMARKERS", ln=1, align='C')
     pdf.ln(6)
 
     # DEEP BIO-PHYSIOLOGICAL MARKERS
-    pdf.set_text_color(0, 0, 0)
-    pdf.set_fill_color(230, 255, 245)
+    pdf.set_text_color(*text_color)
+    pdf.set_fill_color(*bg_scorecard)
     pdf.set_font("Arial", 'B', 9)
     pdf.cell(0, 7, " [ DEEP BIO-PHYSIOLOGICAL DERMAL SCAN MARKERS ]", ln=1, fill=True)
     pdf.set_font("Arial", '', 8.5)
@@ -1432,6 +1714,10 @@ with st.sidebar:
     st.header("👤 Patient Profile")
     patient_name = st.text_input("Full Name", "Guest User")
     patient_age  = st.slider("Age", 1, 100, 25)
+    st.divider()
+    # Theme Selection
+    st.markdown("**🎨 Report Customization**")
+    pdf_theme = st.selectbox("Clinical PDF Theme", ["Clinical Lab Blue", "Dark Cyberpunk", "Apothecary Earth"])
     st.divider()
     st.markdown("**🩺 Clinical Engine Status**")
     st.success("✅ CIELab Colorimetry: Online")
@@ -1580,6 +1866,32 @@ with col1:
                 - 🔵/🟢 **Blue / Green**: Cool thermal baseline (normal/quiescent skin).
                 """)
 
+            # Show Wood's Lamp UV Scan
+            if "uv_img" in cd_store:
+                st.markdown("---")
+                st.markdown("🌌 **UV-Dermal Wood's Lamp Scan Simulator**")
+                st.image(cd_store["uv_img"], caption="UV-Dermal Fluorescence Scan (Melanin & Porphyrins)", use_container_width=True)
+                st.info("""
+                **UV Fluorescence Legend**:
+                - 🟣 **Deep Violet / Indigo**: Standard melanin baseline tissue under blacklight.
+                - 🟢 **Glowing Neon Green**: Active bacterial porphyrins (acne precursors in sebum channels).
+                - ⚫ **Dark / Black spots**: Deep-dermal sun damage (melanin UV absorption zones).
+                """)
+
+            # 10-Year Age Progression Simulator
+            if "img" in diag_store:
+                st.markdown("---")
+                st.markdown("⏳ **10-Year Bio-Stability Age Progression Simulator**")
+                prog_col1, prog_col2 = st.columns(2)
+                with prog_col1:
+                    sim_year = st.slider("Simulate Projection (Years)", 0, 10, 0, key="sim_year_slider")
+                with prog_col2:
+                    sim_path = st.radio("Simulation Path", ["Unmanaged (Aging)", "Optimized (Treatment)"], key="sim_path_radio")
+                
+                is_optimized = sim_path == "Optimized (Treatment)"
+                simulated_image = simulate_skin_progression(diag_store["img"], final_mask, sim_year, is_optimized)
+                st.image(simulated_image, caption=f"Age Progression simulation: Year +{sim_year} ({sim_path})", use_container_width=True)
+
 with col2:
     st.subheader("📊 Clinical Diagnostic Insights")
 
@@ -1634,6 +1946,14 @@ with col2:
         </div>
         """, unsafe_allow_html=True)
 
+        # Glowing Face Mesh Schematic Plot
+        st.markdown("🕸️ **Diagnostic Face Mesh Schematic**")
+        mesh_fig = generate_diagnostic_mesh_plot(diag_store["img"])
+        if mesh_fig is not None:
+            st.pyplot(mesh_fig)
+        else:
+            st.warning("Mesh Schematic unavailable (face landmarks not detected).")
+
         # Deep Bio-Markers (grid)
         st.markdown("### 🧬 Deep Bio-Physiological Dermal Markers")
         mc1, mc2, mc3 = st.columns(3)
@@ -1674,7 +1994,7 @@ with col2:
                 st.write(f"- **{name}**: {imp*100:.1f}% importance")
 
         # Treatment tabs
-        tab1, tab2, tab3, tab4, tab5 = st.tabs(["💊 Clinical Protocol", "🥗 Nutrition", "📈 Bio-Forecast", "📋 Pigmentation", "📈 Monitoring & History"])
+        tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["💊 Clinical Protocol", "🥗 Nutrition", "📈 Bio-Forecast", "📋 Pigmentation", "📈 Monitoring & History", "💬 AI Consultant"])
 
         age_focus, topical_rx, prescription_rx, procedure_rx, lifestyle_rx = get_clinical_plan(
             label, patient_age, cd['pigment_type'], cd['pigment_density'])
@@ -1822,6 +2142,47 @@ with col2:
                 for sp in ax_hist.spines.values(): sp.set_edgecolor('white')
                 st.pyplot(fig_history)
 
+        with tab6:
+            st.markdown("### 💬 AI Dermatological Consultant (Clinical Consult)")
+            st.markdown("###### Ask follow-up questions about your recovery protocol, dietary rules, or biomarker indices.")
+            
+            # Chat history store
+            if "chat_messages" not in st.session_state:
+                st.session_state["chat_messages"] = [
+                    {"role": "assistant", "content": f"Hello {patient_name}! I have reviewed your skin analysis. Your primary diagnosis is **{label}** with a skin health index of **{shs}%**. How can I assist you today?"}
+                ]
+                
+            # Display chat messages
+            for msg in st.session_state["chat_messages"]:
+                st.chat_message(msg["role"]).write(msg["content"])
+                
+            # Input
+            if user_query := st.chat_input("Ask about your skin (e.g. 'tell me about my diet', 'acne treatment'):", key="chatbot_input_key"):
+                # Add user message
+                st.session_state["chat_messages"].append({"role": "user", "content": user_query})
+                st.chat_message("user").write(user_query)
+                
+                # Generate clinical response
+                query_lower = user_query.lower()
+                response = ""
+                
+                if "diet" in query_lower or "nutrition" in query_lower or "food" in query_lower:
+                    response = f"Based on your diagnosis (**{label}**) and Fitzpatrick skin type, here is your clinical nutrition focus: "
+                    response += f"\n- **Priority**: {dynamic_diet[:250]}..."
+                elif "acne" in query_lower or "lesion" in query_lower or "inflammation" in query_lower:
+                    response = f"Your IGA Acne score is {iga}/4 (Inflammation: {cd.get('inflammation_index')}%). "
+                    response += f"\n- **Topical Rx Protocol**: {topical_rx[:250]}...\n- Make sure to avoid comedogenic cosmetics and keep skin hydrated."
+                elif "wrinkle" in query_lower or "age" in query_lower or "aging" in query_lower:
+                    response = f"Your skin photoaging is classified as GLOGAU Type {glogau}/4 (Wrinkle Index: {cd.get('wrinkle_index')}%). "
+                    response += f"\n- **Lifestyle / Procedure Plan**: {procedure_rx[:200]}...\n- Ensure daily application of broad-spectrum SPF 50+."
+                elif "routine" in query_lower or "prescription" in query_lower or "treatment" in query_lower:
+                    response = f"Here is your clinical recovery overview: \n- **Topical OTC/Rx**: {topical_rx[:150]}...\n- **Lifestyle modifications**: {lifestyle_rx[:150]}..."
+                else:
+                    response = f"Thank you for asking! For your condition (**{label}**), our clinical engine recommends focusing on: \n1. **Barrier Repair**: {lifestyle_rx[:120]}...\n2. **Topical Recovery**: {topical_rx[:120]}...\n3. **Dietary Integrity**: {dynamic_diet[:120]}..."
+                    
+                st.session_state["chat_messages"].append({"role": "assistant", "content": response})
+                st.chat_message("assistant").write(response)
+
         # PDF Generation
         st.divider()
         st.subheader("📄 Clinical Report Generation")
@@ -1852,9 +2213,9 @@ with col2:
                 topical_rx=topical_rx, prescription_rx=prescription_rx,
                 procedure_rx=procedure_rx, lifestyle_rx=lifestyle_rx,
                 diet_plan=dynamic_diet, eye_rx=eye_rx_data,
-                img=img, thermal_img=cd.get("thermal_img", None), plot_buf=pdf_plot_buf,
+                img=img, thermal_img=cd.get("thermal_img", None), uv_img=cd.get("uv_img", None), plot_buf=pdf_plot_buf,
                 skin_health_score=shs, eye_status=es, retina_score=rs,
-                probs=probs, iga_score=iga, glogau_score=glogau
+                probs=probs, iga_score=iga, glogau_score=glogau, theme=pdf_theme
             ))
 
             btn1, btn2 = st.columns(2)
