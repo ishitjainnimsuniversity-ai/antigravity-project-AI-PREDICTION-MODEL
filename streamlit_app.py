@@ -911,6 +911,89 @@ def generate_diagnostic_mesh_plot(img):
         return None
 
 
+def generate_face_diagnostic_overlay(img, final_mask, clinical_data):
+    """
+    Blends color-coded diagnostic paints over the MediaPipe ROI mask based on metrics:
+    - Red for Erythema (redness/inflammation)
+    - Yellow for Sebum (oiliness in T-zone)
+    - Blue/Teal for Hydration
+    """
+    try:
+        orig_np = np.array(img.convert('RGB'))
+        overlay = orig_np.copy()
+        h, w, c = orig_np.shape
+        
+        # Create a blank tint canvas
+        tint = np.zeros_like(orig_np)
+        
+        ei = clinical_data.get("erythema_index", 15)
+        sebum = clinical_data.get("sebum_index", 40)
+        hydration = clinical_data.get("hydration_index", 50)
+        
+        # Calculate color channels based on patient metrics
+        r_val = int(np.clip(ei * 4.0, 0, 180))
+        g_val = int(np.clip(sebum * 2.5, 0, 120))
+        b_val = int(np.clip(hydration * 3.0, 0, 180))
+        
+        # Red channel gets higher intensity if erythema is high
+        tint[:, :, 0] = r_val
+        # Green channel + Red channel = Yellow (for oiliness)
+        tint[:, :, 1] = g_val
+        # Blue channel gets intensity for hydration
+        tint[:, :, 2] = b_val
+        
+        # Smooth the tint canvas slightly to look glowing
+        if cv2 is not None:
+            tint = cv2.GaussianBlur(tint, (21, 21), 0)
+            
+        mask_3d = np.repeat(final_mask[:, :, np.newaxis], 3, axis=2)
+        
+        # Blend the skin region
+        if cv2 is not None:
+            blended = cv2.addWeighted(orig_np, 0.75, tint, 0.25, 0)
+        else:
+            blended = (orig_np * 0.75 + tint * 0.25).astype(np.uint8)
+            
+        # Apply mask
+        overlay[mask_3d] = blended[mask_3d]
+        overlay[~mask_3d] = (orig_np[~mask_3d] * 0.25).astype(np.uint8) # Dim out non-face pixels
+        
+        return Image.fromarray(overlay)
+    except Exception:
+        return img
+
+
+def play_voice_guidance(text):
+    """
+    Triggers client-side Speech Synthesis Utterance using HTML5 Web Speech API.
+    Bypasses python server driver limitations entirely.
+    """
+    import html
+    escaped_text = html.escape(text).replace("'", "\\'")
+    js_code = f"""
+    <script>
+        if ('speechSynthesis' in window) {{
+            window.speechSynthesis.cancel();
+            var msg = new SpeechSynthesisUtterance('{escaped_text}');
+            msg.rate = 0.95;
+            msg.pitch = 1.0;
+            var voices = window.speechSynthesis.getVoices();
+            for (var i = 0; i < voices.length; i++) {{
+                if (voices[i].name.indexOf('Google US English') !== -1 || 
+                    voices[i].name.indexOf('Microsoft Zira') !== -1 ||
+                    voices[i].name.indexOf('Samantha') !== -1) {{
+                    msg.voice = voices[i];
+                    break;
+                }}
+            }}
+            window.speechSynthesis.speak(msg);
+        }}
+    </script>
+    """
+    import streamlit.components.v1 as components
+    components.html(js_code, height=0, width=0)
+
+
 def full_dermatological_analysis(img):
     """
     Master clinical analysis function.
@@ -1776,6 +1859,11 @@ with st.sidebar:
     st.markdown("**🎨 Report Customization**")
     pdf_theme = st.selectbox("Clinical PDF Theme", ["Clinical Lab Blue", "Dark Cyberpunk", "Apothecary Earth"])
     st.divider()
+    
+    st.markdown("**🛡️ Automated Suite Features**")
+    enable_voice = st.checkbox("🔈 Enable Voice Assistant Guidance", value=True)
+    enable_3d_paint = st.checkbox("🎭 Enable 3D Diagnostic Heatmap Paint", value=True)
+    st.divider()
     st.markdown("**🩺 Clinical Engine Status**")
     st.success("✅ CIELab Colorimetry: Online")
     st.success("✅ GLCM Texture Engine: Online")
@@ -1885,6 +1973,7 @@ with col1:
                     "eye_status": eye_status, "retina_score": retina_score,
                     "iga_score": iga_score, "glogau_score": glogau_score
                 }
+                st.session_state['should_speak'] = True
 
         # Visualizations (under analysis button)
         if 'calibrated_image' in st.session_state:
@@ -1895,14 +1984,32 @@ with col1:
             raw_img = diag_store["original_img"]
             cd_store = diag_store["clinical_data"]
             
+            # Trigger client-side voice guide summary once on complete
+            if st.session_state.get('should_speak') and enable_voice:
+                label = diag_store["label"]
+                shs = diag_store["skin_health_score"]
+                summary_text = (
+                    f"Scan complete for patient {patient_name}. "
+                    f"The neural clinical engine identified {label} with a skin health index of {shs} percent. "
+                    f"Please review your personalized clinical recovery plan and download your report."
+                )
+                play_voice_guidance(summary_text)
+                st.session_state['should_speak'] = False
+            
             # Show MediaPipe ROI mask overlay
             try:
                 # We re-run mask calculation just to get the mask array
                 final_mask, is_mp = get_mediapipe_skin_mask(diag_store["img"])
-                orig_np = np.array(diag_store["img"].convert('RGB'))
-                overlay = orig_np.copy()
-                overlay[~final_mask] = (overlay[~final_mask] * 0.25).astype(np.uint8) # Dim out background/hair/eyes
-                st.image(Image.fromarray(overlay), caption="MediaPipe Face Mesh ROI Mask (Isolated Skin)", use_container_width=True)
+                if enable_3d_paint:
+                    overlay_img = generate_face_diagnostic_overlay(diag_store["img"], final_mask, cd_store)
+                    caption_str = "MediaPipe Face Mesh 3D Diagnostic Paint Overlay"
+                else:
+                    orig_np = np.array(diag_store["img"].convert('RGB'))
+                    overlay = orig_np.copy()
+                    overlay[~final_mask] = (overlay[~final_mask] * 0.25).astype(np.uint8) # Dim out background/hair/eyes
+                    overlay_img = Image.fromarray(overlay)
+                    caption_str = "MediaPipe Face Mesh ROI Mask (Isolated Skin)"
+                st.image(overlay_img, caption=caption_str, use_container_width=True)
                 
                 if is_mp:
                     st.success("🎯 **MediaPipe Face Mesh Active**: Successfully isolated cheek, forehead, and chin skin. Hair, background, and eyes stripped to protect GLCM/LBP texture analysis.")
