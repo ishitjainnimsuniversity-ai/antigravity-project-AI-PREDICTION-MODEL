@@ -198,15 +198,24 @@ def extract_biomarkers(img, label):
     # Redness
     total_val = R_skin + G_skin + B_skin + 1e-5
     r_ratio = R_skin / total_val
-    red_spots_ratio = np.sum(r_ratio > 0.38) / len(r_ratio) if len(r_ratio) > 0 else 0.0
+    red_spots_ratio = np.sum(r_ratio > 0.415) / len(r_ratio) if len(r_ratio) > 0 else 0.0
     
     # Gradients & Variance
     gray = img.convert('L')
     gray_arr = np.array(gray, dtype=np.float32)
+    gray_skin = gray_arr[skin_mask]
+    
     grad_x = np.abs(gray_arr[:, 1:] - gray_arr[:, :-1])
     grad_y = np.abs(gray_arr[1:, :] - gray_arr[:-1, :])
-    mean_grad = np.mean(grad_x) + np.mean(grad_y)
-    std_dev = np.std(gray_arr)
+    
+    skin_mask_x = skin_mask[:, :-1]
+    skin_mask_y = skin_mask[:-1, :]
+    
+    mean_grad_x = np.mean(grad_x[skin_mask_x]) if np.sum(skin_mask_x) > 0 else 0.0
+    mean_grad_y = np.mean(grad_y[skin_mask_y]) if np.sum(skin_mask_y) > 0 else 0.0
+    mean_grad = mean_grad_x + mean_grad_y
+    
+    std_dev = np.std(gray_skin) if len(gray_skin) > 0 else np.std(gray_arr)
     
     # 1. Sebum (Oiliness) Index
     sebum_count = np.sum(lum_skin > 210)
@@ -302,39 +311,37 @@ def predict_skin(img, age=25):
     # 2. Redness Extraction (for Acne/Eczema/Inflammations)
     total_val = R_skin + G_skin + B_skin + 1e-5
     r_ratio = R_skin / total_val
-    mean_redness = np.mean(r_ratio)
-    red_spots_ratio = np.sum(r_ratio > 0.38) / len(r_ratio)
+    mean_redness = np.mean(r_ratio) if len(r_ratio) > 0 else 0.33
+    red_spots_ratio = np.sum(r_ratio > 0.415) / len(r_ratio) if len(r_ratio) > 0 else 0.0
     
     # 3. Fine Edge & Texture Analysis (for wrinkles and scaling)
     gray = img.convert('L')
     gray_arr = np.array(gray, dtype=np.float32)
+    gray_skin = gray_arr[skin_mask]
     
     # Simple Sobel-like edge/variance analysis
     grad_x = np.abs(gray_arr[:, 1:] - gray_arr[:, :-1])
     grad_y = np.abs(gray_arr[1:, :] - gray_arr[:-1, :])
-    mean_grad = np.mean(grad_x) + np.mean(grad_y)
+    
+    skin_mask_x = skin_mask[:, :-1]
+    skin_mask_y = skin_mask[:-1, :]
+    
+    mean_grad_x = np.mean(grad_x[skin_mask_x]) if np.sum(skin_mask_x) > 0 else 0.0
+    mean_grad_y = np.mean(grad_y[skin_mask_y]) if np.sum(skin_mask_y) > 0 else 0.0
+    mean_grad = mean_grad_x + mean_grad_y
     
     # Overall local intensity standard deviation (contrast/roughness)
-    std_dev = np.std(gray_arr)
+    std_dev = np.std(gray_skin) if len(gray_skin) > 0 else np.std(gray_arr)
     
     # 4. Neural Network or Heuristic decision
     scores = np.zeros(5)
     # 0: Acne, 1: Eczema, 2: Psoriasis, 3: Wrinkles, 4: Healthy Skin
     
-    # Acne: characterized by localized red spots
-    scores[0] = red_spots_ratio * 15.0 - (mean_grad / 15.0) - 2.0
-    
-    # Eczema: red patches with moderate roughness
-    scores[1] = mean_redness * 12.0 + (std_dev / 50.0) * 3.0 - 6.0
-    
-    # Psoriasis: scaling, rough texture with moderate redness
-    scores[2] = (std_dev / 50.0) * 6.0 + red_spots_ratio * 4.0 - 3.0
-    
-    # Wrinkles: high fine edges, low redness
-    scores[3] = (mean_grad / 10.0) * 4.0 - red_spots_ratio * 10.0 - 1.0
-    
-    # Healthy Skin: low redness, low texture roughness
-    scores[4] = 5.0 - red_spots_ratio * 18.0 - (std_dev / 50.0) * 6.0
+    scores[0] = red_spots_ratio * 15.0 - (mean_grad / 10.0) - 2.0
+    scores[1] = mean_redness * 10.0 + (std_dev / 50.0) * 3.0 - 5.5
+    scores[2] = (std_dev / 50.0) * 5.0 + red_spots_ratio * 4.0 - 3.5
+    scores[3] = (mean_grad / 5.0) * 4.0 - red_spots_ratio * 10.0 - 1.0
+    scores[4] = 5.0 - red_spots_ratio * 16.0 - (std_dev / 30.0) * 4.0
     
     # Apply clinical age biases to ensure age-specific realism
     if age < 20:
