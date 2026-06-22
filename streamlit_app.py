@@ -69,29 +69,29 @@ SKIN_CLASSES = ["Acne", "Eczema", "Psoriasis", "Wrinkles", "Healthy Skin"]
 
 # Real IGA (Investigator's Global Assessment) Acne Scale used in clinical trials
 IGA_SCALE = {
-    0: "Clear — No visible lesions. Skin is completely normal.",
-    1: "Almost Clear — Rare non-inflammatory lesions, no more than one papule.",
-    2: "Mild — Some non-inflammatory lesions present; few inflammatory lesions.",
-    3: "Moderate — Multiple inflammatory lesions present; some nodules possible.",
-    4: "Severe — Many inflammatory lesions; nodules and pustules dominant."
+    0: "Clear - No visible lesions. Skin is completely normal.",
+    1: "Almost Clear - Rare non-inflammatory lesions, no more than one papule.",
+    2: "Mild - Some non-inflammatory lesions present; few inflammatory lesions.",
+    3: "Moderate - Multiple inflammatory lesions present; some nodules possible.",
+    4: "Severe - Many inflammatory lesions; nodules and pustules dominant."
 }
 
 # Real GLOGAU Photoaging Classification used by dermatologists worldwide
 GLOGAU_SCALE = {
-    1: "Type I — Mild Photoaging (Age 20-35). No keratoses. Minimal wrinkling. No scarring.",
-    2: "Type II — Moderate Photoaging (Age 35-50). Early actinic keratoses. Early wrinkling visible at rest.",
-    3: "Type III — Advanced Photoaging (Age 50-65). Actinic keratoses present. Wrinkling at rest. Dyschromia.",
-    4: "Type IV — Severe Photoaging (Age 60-75). Actinic keratoses & skin cancer history. Much wrinkling. Severe dyschromia."
+    1: "Type I - Mild Photoaging (Age 20-35). No keratoses. Minimal wrinkling. No scarring.",
+    2: "Type II - Moderate Photoaging (Age 35-50). Early actinic keratoses. Early wrinkling visible at rest.",
+    3: "Type III - Advanced Photoaging (Age 50-65). Actinic keratoses present. Wrinkling at rest. Dyschromia.",
+    4: "Type IV - Severe Photoaging (Age 60-75). Actinic keratoses & skin cancer history. Much wrinkling. Severe dyschromia."
 }
 
 # Fitzpatrick Skin Type Scale (clinically validated)
 FITZPATRICK_SCALE = {
-    1: {"name": "Type I — Very Fair", "ITA_range": "> 55°", "desc": "Always burns, never tans. Celtic/Nordic skin. Highest UV sensitivity.", "spf": "SPF 50+ mandatory"},
-    2: {"name": "Type II — Fair", "ITA_range": "41° – 55°", "desc": "Usually burns, tans minimally. Northern European skin. Very high UV sensitivity.", "spf": "SPF 50+ recommended"},
-    3: {"name": "Type III — Medium", "ITA_range": "28° – 41°", "desc": "Sometimes burns, tans uniformly. Central European skin. Moderate UV sensitivity.", "spf": "SPF 30-50 recommended"},
-    4: {"name": "Type IV — Olive", "ITA_range": "10° – 28°", "desc": "Rarely burns, tans easily. Mediterranean/Latin skin. Low UV sensitivity.", "spf": "SPF 30 recommended"},
-    5: {"name": "Type V — Brown", "ITA_range": "-30° – 10°", "desc": "Very rarely burns, tans profusely. Middle Eastern/Asian skin. Very low UV sensitivity.", "spf": "SPF 15-30 recommended"},
-    6: {"name": "Type VI — Very Dark", "ITA_range": "< -30°", "desc": "Never burns, deeply pigmented. African skin. Lowest UV sensitivity, highest melanin protection.", "spf": "SPF 15 recommended"}
+    1: {"name": "Type I - Very Fair", "ITA_range": "> 55 deg", "desc": "Always burns, never tans. Celtic/Nordic skin. Highest UV sensitivity.", "spf": "SPF 50+ mandatory"},
+    2: {"name": "Type II - Fair", "ITA_range": "41 deg - 55 deg", "desc": "Usually burns, tans minimally. Northern European skin. Very high UV sensitivity.", "spf": "SPF 50+ recommended"},
+    3: {"name": "Type III - Medium", "ITA_range": "28 deg - 41 deg", "desc": "Sometimes burns, tans uniformly. Central European skin. Moderate UV sensitivity.", "spf": "SPF 30-50 recommended"},
+    4: {"name": "Type IV - Olive", "ITA_range": "10 deg - 28 deg", "desc": "Rarely burns, tans easily. Mediterranean/Latin skin. Low UV sensitivity.", "spf": "SPF 30 recommended"},
+    5: {"name": "Type V - Brown", "ITA_range": "-30 deg - 10 deg", "desc": "Very rarely burns, tans profusely. Middle Eastern/Asian skin. Very low UV sensitivity.", "spf": "SPF 15-30 recommended"},
+    6: {"name": "Type VI - Very Dark", "ITA_range": "< -30 deg", "desc": "Never burns, deeply pigmented. African skin. Lowest UV sensitivity, highest melanin protection.", "spf": "SPF 15 recommended"}
 }
 
 # Clinical treatment protocols (evidence-based, age-stratified)
@@ -99,7 +99,7 @@ CLINICAL_PROTOCOLS = {
     "Acne": {
         "<20": {
             "topical": "Salicylic Acid 2% BHA Cleanser (AM) + Niacinamide 5% Serum (AM/PM) + Oil-free non-comedogenic moisturizer. Avoid occlusive products.",
-            "prescription": "Consider Adapalene 0.1% Gel (Rx-OTC) — start 2x/week to build tolerance.",
+            "prescription": "Consider Adapalene 0.1% Gel (Rx-OTC) - start 2x/week to build tolerance.",
             "procedure": "Gentle chemical exfoliation with Mandelic Acid 5% weekly. No extraction without professional supervision.",
             "lifestyle": "Change pillowcases every 2-3 days. Use micellar water for makeup removal. Diet: eliminate high-GI foods."
         },
@@ -117,22 +117,22 @@ CLINICAL_PROTOCOLS = {
         },
         "55+": {
             "topical": "Lactic Acid 5-10% AHA cleanser (prevents dryness) + Azelaic Acid 10% cream + Rich Ceramide NP moisturizer.",
-            "prescription": "Low-strength Adapalene 0.1% (2x/week). Avoid aggressive BHAs — skin more fragile at this age.",
+            "prescription": "Low-strength Adapalene 0.1% (2x/week). Avoid aggressive BHAs - skin more fragile at this age.",
             "procedure": "Gentle enzyme peels only. Avoid aggressive chemical treatments.",
-            "lifestyle": "Rich in antioxidant foods. Hydration critical — sebaceous glands become more active post-menopause."
+            "lifestyle": "Rich in antioxidant foods. Hydration critical - sebaceous glands become more active post-menopause."
         }
     },
     "Eczema": {
         "<20": {
             "topical": "Colloidal Oatmeal cream + CeraVe Moisturizing Cream (Ceramide NP, NX, AP) twice daily. Vanicream for sensitive skin.",
             "prescription": "Hydrocortisone 1% OTC for flares. Tacrolimus 0.03% (Rx) for face/sensitive areas. Avoid fluorinated steroids on face.",
-            "procedure": "Wet wrap therapy during flares — dampen skin, apply moisturizer, wrap in wet cotton.",
+            "procedure": "Wet wrap therapy during flares - dampen skin, apply moisturizer, wrap in wet cotton.",
             "lifestyle": "Identify triggers: dust mites, pet dander, fragrances. 100% cotton clothing. Bath in lukewarm water max 10 min."
         },
         "20-34": {
             "topical": "EpiCream Medical Emollient or Vanicream + Panthenol (Vitamin B5) 5% serum AM/PM.",
             "prescription": "Clobetasone Butyrate 0.05% Cream (short-term flares). Crisaborole 2% Ointment (Rx) for mild-moderate.",
-            "procedure": "UVB Narrowband Phototherapy (311nm) 3x/week — gold standard for moderate eczema.",
+            "procedure": "UVB Narrowband Phototherapy (311nm) 3x/week - gold standard for moderate eczema.",
             "lifestyle": "Air purifier in bedroom. Fragrance-free detergent (Tide Free, All Free). Probiotic supplementation."
         },
         "35-54": {
@@ -150,13 +150,13 @@ CLINICAL_PROTOCOLS = {
     },
     "Psoriasis": {
         "<20": {
-            "topical": "Coal Tar Shampoo + Calcipotriol 0.005% cream (Vitamin D analogue) — most tolerated by young skin.",
+            "topical": "Coal Tar Shampoo + Calcipotriol 0.005% cream (Vitamin D analogue) - most tolerated by young skin.",
             "prescription": "Mild Corticosteroid (Hydrocortisone 2.5%) for scalp/face. Avoid potent fluorinated steroids.",
-            "procedure": "NBUVB Phototherapy 3x/week — safest systemic option for younger patients.",
+            "procedure": "NBUVB Phototherapy 3x/week - safest systemic option for younger patients.",
             "lifestyle": "Identify triggers: streptococcal infections (strep throat can trigger guttate psoriasis). Stress management."
         },
         "20-34": {
-            "topical": "Calcipotriol/Betamethasone Dipropionate combination (Dovobet) — Gold standard for plaque psoriasis.",
+            "topical": "Calcipotriol/Betamethasone Dipropionate combination (Dovobet) - Gold standard for plaque psoriasis.",
             "prescription": "Methotrexate (Rx) for moderate-severe. Biologics: Secukinumab (IL-17A inhibitor) for rapid clearance.",
             "procedure": "PUVA Phototherapy or NBUVB. Excimer Laser (308nm) for localized plaques.",
             "lifestyle": "Alcohol abstinence critical. Gluten elimination trial if associated with celiac. BMI management."
@@ -183,7 +183,7 @@ CLINICAL_PROTOCOLS = {
         },
         "20-34": {
             "topical": "Vitamin C L-Ascorbic Acid 10-15% (AM) + Niacinamide 10% + Retinol 0.2-0.5% (PM, 3x/week).",
-            "prescription": "Tretinoin 0.025% (PM) — the gold standard. Works by accelerating cell turnover and stimulating collagen.",
+            "prescription": "Tretinoin 0.025% (PM) - the gold standard. Works by accelerating cell turnover and stimulating collagen.",
             "procedure": "Preventative Botulinum Toxin A micro-injections for expression lines. Chemical peels (Glycolic 30-50%).",
             "lifestyle": "Sleep on silk pillowcase. Wear UV400 sunglasses. Antioxidant-rich diet (Vitamin C, E, polyphenols)."
         },
@@ -195,7 +195,7 @@ CLINICAL_PROTOCOLS = {
         },
         "55+": {
             "topical": "Retinaldehyde 0.1% (gentler than retinoic acid) + Matrixyl 3000 Peptides + Squalane + Heavy ceramide cream.",
-            "prescription": "Tretinoin 0.025-0.05% — still gold standard. Estrogen replacement therapy consideration (F).",
+            "prescription": "Tretinoin 0.025-0.05% - still gold standard. Estrogen replacement therapy consideration (F).",
             "procedure": "Resurfacing: Fractional CO2 Laser, Er:YAG Laser. Volume restoration with HA Fillers. Thread lifting.",
             "lifestyle": "Protein intake critical (1.2g/kg/day). Collagen synthesis requires Vitamin C, proline, lysine."
         }
@@ -251,7 +251,7 @@ CLINICAL_DIETS = {
     "Wrinkles": {
         "avoid": "Refined sugar (glycation destroys collagen), trans fats, excessive alcohol, processed carbohydrates, smoking.",
         "increase": "Vitamin C foods (bell peppers, citrus), carotenoids (carrots, tomatoes), polyphenols (berries, dark chocolate), collagen-rich broths.",
-        "supplements": "Collagen peptides (Verisol 2.5g/day — clinical Grade A). Vitamin C 500mg/day. Astaxanthin 4mg/day. CoQ10 100mg/day.",
+        "supplements": "Collagen peptides (Verisol 2.5g/day - clinical Grade A). Vitamin C 500mg/day. Astaxanthin 4mg/day. CoQ10 100mg/day.",
         "evidence": "Verisol collagen peptides reduce eye wrinkle depth by 20% in 8 weeks (Skin Pharmacol Physiol 2014)."
     },
     "Healthy Skin": {
@@ -1008,7 +1008,10 @@ def sanitize_text(text):
     }
     for orig, rep in replacements.items():
         text = text.replace(orig, rep)
-    return text.encode('latin-1', 'replace').decode('latin-1')
+    try:
+        return text.encode('latin-1', 'replace').decode('latin-1')
+    except Exception:
+        return text.encode('ascii', 'replace').decode('ascii')
 
 
 def generate_clinical_pdf(name, age, prediction, clinical_data, age_focus,
@@ -1149,18 +1152,27 @@ def generate_clinical_pdf(name, age, prediction, clinical_data, age_focus,
     pdf.cell(0, 8, " [ SCAN IMAGE & 10-YEAR BIO-STABILITY PROJECTION ]", ln=1, fill=True)
     pdf.ln(2)
     y_vis = pdf.get_y()
-    temp_img_path = "temp_web_image.jpg"
-    temp_plot_path = "temp_plot.png"
-    img.save(temp_img_path)
-    with open(temp_plot_path, "wb") as f:
-        f.write(plot_buf.getvalue())
-    pdf.image(temp_img_path, x=12, y=y_vis, w=88)
-    pdf.image(temp_plot_path, x=108, y=y_vis, w=88)
+    import uuid
+    unique_id = uuid.uuid4().hex
+    temp_img_path = f"temp_web_image_{unique_id}.jpg"
+    temp_plot_path = f"temp_plot_{unique_id}.png"
     try:
-        os.remove(temp_img_path)
-        os.remove(temp_plot_path)
-    except Exception:
-        pass
+        img.save(temp_img_path)
+        with open(temp_plot_path, "wb") as f:
+            f.write(plot_buf.getvalue())
+        pdf.image(temp_img_path, x=12, y=y_vis, w=88)
+        pdf.image(temp_plot_path, x=108, y=y_vis, w=88)
+    finally:
+        try:
+            if os.path.exists(temp_img_path):
+                os.remove(temp_img_path)
+        except Exception:
+            pass
+        try:
+            if os.path.exists(temp_plot_path):
+                os.remove(temp_plot_path)
+        except Exception:
+            pass
     pdf.set_y(y_vis + 68)
     pdf.ln(8)
 
