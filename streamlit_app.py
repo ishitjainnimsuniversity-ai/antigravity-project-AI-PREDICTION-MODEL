@@ -2220,23 +2220,81 @@ with col2:
                 st.chat_message("user").write(user_query)
                 
                 # Generate clinical response
-                query_lower = user_query.lower()
-                response = ""
-                
-                if "diet" in query_lower or "nutrition" in query_lower or "food" in query_lower:
-                    response = f"Based on your diagnosis (**{label}**) and Fitzpatrick skin type, here is your clinical nutrition focus: "
-                    response += f"\n- **Priority**: {dynamic_diet[:250]}..."
-                elif "acne" in query_lower or "lesion" in query_lower or "inflammation" in query_lower:
-                    response = f"Your IGA Acne score is {iga}/4 (Inflammation: {cd.get('inflammation_index')}%). "
-                    response += f"\n- **Topical Rx Protocol**: {topical_rx[:250]}...\n- Make sure to avoid comedogenic cosmetics and keep skin hydrated."
-                elif "wrinkle" in query_lower or "age" in query_lower or "aging" in query_lower:
-                    response = f"Your skin photoaging is classified as GLOGAU Type {glogau}/4 (Wrinkle Index: {cd.get('wrinkle_index')}%). "
-                    response += f"\n- **Lifestyle / Procedure Plan**: {procedure_rx[:200]}...\n- Ensure daily application of broad-spectrum SPF 50+."
-                elif "routine" in query_lower or "prescription" in query_lower or "treatment" in query_lower:
-                    response = f"Here is your clinical recovery overview: \n- **Topical OTC/Rx**: {topical_rx[:150]}...\n- **Lifestyle modifications**: {lifestyle_rx[:150]}..."
-                else:
-                    response = f"Thank you for asking! For your condition (**{label}**), our clinical engine recommends focusing on: \n1. **Barrier Repair**: {lifestyle_rx[:120]}...\n2. **Topical Recovery**: {topical_rx[:120]}...\n3. **Dietary Integrity**: {dynamic_diet[:120]}..."
+                with st.spinner("⚕️ AI Consultant is formulating recommendation..."):
+                    import ssl
+                    import urllib.request
+                    import json
                     
+                    # Prepare advanced system context
+                    system_prompt = (
+                        f"You are a helpful, professional, and certified AI Dermatology Consultant. "
+                        f"You are consulting for patient {patient_name} (Age: {patient_age}, Fitzpatrick Skin Type: {cd.get('fitzpatrick_type')}). "
+                        f"Primary Diagnosis: {label} (IGA Severity Score: {iga}/4, Glogau Photoaging Stage: {glogau}/4). "
+                        f"Calculated Skin Health Index: {shs}%, Retina Health Score: {rs}% (Ocular status: {es}). "
+                        f"Biomarkers:\n"
+                        f"- Sebum/Oiliness Index: {cd.get('sebum_index')}%\n"
+                        f"- Hydration Index: {cd.get('hydration_index')}%\n"
+                        f"- TEWL Proxy: {cd.get('tewl_proxy')} g/m2h\n"
+                        f"- Pore Size Index: {cd.get('pore_index')}%\n"
+                        f"- Wrinkle Depth: {cd.get('wrinkle_index')}%\n"
+                        f"- Skin Inflammation: {cd.get('inflammation_index')}%\n"
+                        f"- Skin Barrier Integrity: {cd.get('barrier_score')}%\n"
+                        f"- UV Photo-damage: {cd.get('uv_damage_score')}%\n"
+                        f"- Physical Lesion Count: {cd.get('lesion_count')}\n\n"
+                        f"Active Treatment Plan:\n"
+                        f"- Topical OTC/Rx Treatments: {topical_rx}\n"
+                        f"- Prescription or Procedural options: {prescription_rx}\n"
+                        f"- In-office Clinical Procedures: {procedure_rx}\n"
+                        f"- Lifestyle & Behavioral changes: {lifestyle_rx}\n"
+                        f"- Nutritional & Supplementation Diet: {dynamic_diet}\n\n"
+                        f"Guidelines:\n"
+                        f"- Give comprehensive, accurate, medical/cosmetic answers.\n"
+                        f"- Always reference the patient's specific biomarkers or active treatment plan above to personalize your advice.\n"
+                        f"- Address the user's question directly. Do not say you are an AI model that cannot diagnose; act as an expert dermatology consultant with this full profile provided.\n"
+                        f"- Keep responses concise, clear, and structured (use bullet points if helpful) with a professional and friendly tone."
+                    )
+                    
+                    # Compile messages history
+                    messages_payload = [{"role": "system", "content": system_prompt}]
+                    for msg in st.session_state["chat_messages"]:
+                        messages_payload.append({"role": msg["role"], "content": msg["content"]})
+                        
+                    # Request to Pollinations.ai (reliable and free chat completion API)
+                    try:
+                        ctx = ssl._create_unverified_context()
+                        url_post = "https://text.pollinations.ai/"
+                        payload = {
+                            "messages": messages_payload,
+                            "model": "openai"
+                        }
+                        req_post = urllib.request.Request(
+                            url_post,
+                            data=json.dumps(payload).encode('utf-8'),
+                            headers={
+                                'Content-Type': 'application/json',
+                                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                            }
+                        )
+                        with urllib.request.urlopen(req_post, context=ctx, timeout=12) as response_:
+                            response_text = response_.read().decode('utf-8', errors='replace')
+                        response = response_text
+                    except Exception as e:
+                        # Fail-safe local rule-based fallback
+                        query_lower = user_query.lower()
+                        if "diet" in query_lower or "nutrition" in query_lower or "food" in query_lower:
+                            response = f"Based on your diagnosis (**{label}**) and Fitzpatrick skin type, here is your clinical nutrition focus: "
+                            response += f"\n- **Priority**: {dynamic_diet[:250]}..."
+                        elif "acne" in query_lower or "lesion" in query_lower or "inflammation" in query_lower:
+                            response = f"Your IGA Acne score is {iga}/4 (Inflammation: {cd.get('inflammation_index')}%). "
+                            response += f"\n- **Topical Rx Protocol**: {topical_rx[:250]}...\n- Make sure to avoid comedogenic cosmetics and keep skin hydrated."
+                        elif "wrinkle" in query_lower or "age" in query_lower or "aging" in query_lower:
+                            response = f"Your skin photoaging is classified as GLOGAU Type {glogau}/4 (Wrinkle Index: {cd.get('wrinkle_index')}%). "
+                            response += f"\n- **Lifestyle / Procedure Plan**: {procedure_rx[:200]}...\n- Ensure daily application of broad-spectrum SPF 50+."
+                        elif "routine" in query_lower or "prescription" in query_lower or "treatment" in query_lower:
+                            response = f"Here is your clinical recovery overview: \n- **Topical OTC/Rx**: {topical_rx[:150]}...\n- **Lifestyle modifications**: {lifestyle_rx[:150]}..."
+                        else:
+                            response = f"Thank you for asking! For your condition (**{label}**), our clinical engine recommends focusing on: \n1. **Barrier Repair**: {lifestyle_rx[:120]}...\n2. **Topical Recovery**: {topical_rx[:120]}...\n3. **Dietary Integrity**: {dynamic_diet[:120]}..."
+                
                 st.session_state["chat_messages"].append({"role": "assistant", "content": response})
                 st.chat_message("assistant").write(response)
 
