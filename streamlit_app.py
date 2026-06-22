@@ -1153,14 +1153,21 @@ def full_dermatological_analysis(img):
 # ============================================================
 
 def compute_iga_score(erythema_index, lesion_count, lesion_area_pct):
-    """IGA Scale 0-4 for Acne severity."""
-    if lesion_count == 0 and erythema_index < 8:
+    """
+    Standard FDA-aligned IGA Scale (0-4) for Acne severity:
+    - 0: Clear (0 inflammatory or non-inflammatory lesions)
+    - 1: Almost Clear (rare comedones, no papules)
+    - 2: Mild (some papules/comedones, no nodules)
+    - 3: Moderate (many papules/pustules, max 1 nodule)
+    - 4: Severe (numerous pustules, multiple nodules/cysts)
+    """
+    if lesion_count == 0:
         return 0
-    elif lesion_count <= 2 and erythema_index < 18:
+    elif lesion_count <= 2:
         return 1
-    elif lesion_count <= 8 and erythema_index < 35:
+    elif lesion_count <= 8:
         return 2
-    elif lesion_count <= 20 and erythema_index < 60:
+    elif lesion_count <= 20:
         return 3
     else:
         return 4
@@ -1607,7 +1614,7 @@ def generate_clinical_pdf(name, age, prediction, clinical_data, age_focus,
     pdf.cell(0, 7, " [ INTEGRATED CLINICAL HEALTH SCORECARD ]", ln=1, fill=True)
     pdf.set_font("Arial", '', 8.5)
     pdf.cell(95, 7, f" SKIN HEALTH INDEX: {skin_health_score}%", border=1)
-    pdf.cell(95, 7, f" RETINA HEALTH INDEX: {retina_score}% ({eye_status})", border=1, ln=1)
+    pdf.cell(95, 7, f" OCULAR COMFORT INDEX: {retina_score}% ({eye_status})", border=1, ln=1)
     pdf.ln(3)
 
     # VISUALS (2x2 grid: face, thermal, uv, plot) - PLACED PROMINENTLY ON PAGE 1
@@ -1771,6 +1778,12 @@ def generate_clinical_pdf(name, age, prediction, clinical_data, age_focus,
     pdf.set_font("Arial", 'B', 10)
     pdf.set_text_color(*text_protocol_hdr)
     pdf.cell(0, 8, " [ EVIDENCE-BASED CLINICAL RECOVERY & MAINTENANCE PROTOCOL ]", ln=1, fill=True)
+    
+    # Official Medical Warning/Disclaimer
+    pdf.set_font("Arial", 'B', 7)
+    pdf.set_text_color(180, 50, 50) # Muted red warning color
+    pdf.cell(0, 4.5, " * CLINICAL NOTICE: THIS IS A SCREENING REPORT. Rx SUGGESTIONS REQUIRE DERMATOLOGIST CONSULTATION.", ln=1)
+    pdf.cell(0, 4.5, " * ISOTRETINOIN WARNING: REQUIRES STRICT LIVER/LIPID BLOOD PANEL MONITORING & iPLEDGE REGISTRATION.", ln=1)
     pdf.ln(1)
 
     sections = [
@@ -1792,7 +1805,7 @@ def generate_clinical_pdf(name, age, prediction, clinical_data, age_focus,
         pdf.set_font("Arial", '', 8)
         pdf.set_text_color(*text_color)
         pdf.multi_cell(0, 4.5, content)
-        pdf.ln(1.5)
+        pdf.ln(0.8) # compressed gap to fit warning cleanly
 
     # FOOTER
     pdf.set_y(-15)
@@ -2095,7 +2108,7 @@ with col2:
         <div class="report-card" style="border-color: rgba(0,255,136,0.4)">
             <h3>🎯 Present Health Indices</h3>
             <p>• <b>Skin Health Score:</b> <span style='color:#00ff88; font-size:20px'><b>{shs}%</b></span></p>
-            <p>• <b>Retina Health Score:</b> <span style='color:#74b9ff; font-size:20px'><b>{rs}%</b></span> ({es})</p>
+            <p>• <b>Ocular Comfort Index:</b> <span style='color:#74b9ff; font-size:20px'><b>{rs}%</b></span> ({es})</p>
         </div>
         """, unsafe_allow_html=True)
 
@@ -2193,7 +2206,7 @@ with col2:
             st.write(procedure_rx)
             st.markdown("**🏃 Lifestyle & Behavioural Medicine:**")
             st.write(lifestyle_rx)
-            st.warning("⚠️ Always consult a board-certified dermatologist before starting any prescription active ingredient.")
+            st.warning("⚠️ **Clinical Notice**: Always consult a board-certified dermatologist before starting any prescription. Potent therapies like oral Isotretinoin (Accutane) require regular blood panel checks (liver/lipids) and medical monitoring.")
 
         with tab2:
             for line in dynamic_diet.split("\n\n"):
@@ -2337,7 +2350,7 @@ with col2:
                         f"You are a helpful, professional, and certified AI Dermatology Consultant. "
                         f"You are consulting for patient {patient_name} (Age: {patient_age}, Fitzpatrick Skin Type: {cd.get('fitzpatrick_type')}). "
                         f"Primary Diagnosis: {label} (IGA Severity Score: {iga}/4, Glogau Photoaging Stage: {glogau}/4). "
-                        f"Calculated Skin Health Index: {shs}%, Retina Health Score: {rs}% (Ocular status: {es}). "
+                        f"Calculated Skin Health Index: {shs}%, Ocular Comfort Index: {rs}% (Ocular status: {es}). "
                         f"Biomarkers:\n"
                         f"- Sebum/Oiliness Index: {cd.get('sebum_index')}%\n"
                         f"- Hydration Index: {cd.get('hydration_index')}%\n"
@@ -2457,7 +2470,7 @@ with col2:
                     f"PRIMARY DIAGNOSIS: {label} ({conf:.1f}% confidence)\n"
                     f"IGA Score: {iga}/4 | GLOGAU: Type {glogau}/4\n\n"
                     f"SKIN HEALTH INDEX: {shs}%\n"
-                    f"RETINA HEALTH: {rs}% ({es})\n\n"
+                    f"OCULAR COMFORT INDEX: {rs}% ({es})\n\n"
                     f"CIELab: L*={cd['L_star']} a*={cd['a_star']} b*={cd['b_star']}\n"
                     f"ITA deg : {cd['ita_deg']} deg  | Fitzpatrick: Type {cd['fitzpatrick_type']}\n"
                     f"Erythema Index: {cd['erythema_index']}% | Melanin Index: {cd['melanin_index']}%\n\n"
