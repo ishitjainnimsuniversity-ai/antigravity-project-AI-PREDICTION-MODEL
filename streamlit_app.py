@@ -455,11 +455,11 @@ def generate_pdf(name, age, prediction, topical_rx, retinol_rx, diet, eye_rx, im
     pdf.rect(0, 0, 210, 40, 'F')
     pdf.set_text_color(0, 200, 255) # Cyan HUD Color
     pdf.set_font("Arial", 'B', 22)
-    pdf.cell(0, 25, " VISION-AI GLOBAL DIAGNOSTIC ", ln=True, align='C')
+    pdf.cell(0, 25, " VISION-AI GLOBAL DIAGNOSTIC ", ln=1, align='C')
     pdf.set_font("Arial", 'I', 10)
     pdf.set_text_color(255, 255, 255)
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    pdf.cell(0, 5, f"ENCRYPTED CLINICAL ANALYSIS | SESSION: {timestamp}", ln=True, align='C')
+    pdf.cell(0, 5, f"ENCRYPTED CLINICAL ANALYSIS | SESSION: {timestamp}", ln=1, align='C')
     
     pdf.ln(15)
     
@@ -467,57 +467,57 @@ def generate_pdf(name, age, prediction, topical_rx, retinol_rx, diet, eye_rx, im
     pdf.set_text_color(0, 0, 0)
     pdf.set_fill_color(230, 245, 255) # Light Cyber Blue
     pdf.set_font("Arial", 'B', 11)
-    pdf.cell(0, 10, " [ BIO-ID: PATIENT DATA PROFILE ]", ln=True, fill=True)
+    pdf.cell(0, 10, " [ BIO-ID: PATIENT DATA PROFILE ]", ln=1, fill=True)
     pdf.set_font("Arial", '', 10)
     pdf.cell(95, 10, f" NAME: {name.upper()}", border=1)
-    pdf.cell(95, 10, f" RANGE: {age} YEARS (STAGE: {'PRIMARY' if age < 30 else 'STABLE'})", border=1, ln=True)
+    pdf.cell(95, 10, f" RANGE: {age} YEARS (STAGE: {'PRIMARY' if age < 30 else 'STABLE'})", border=1, ln=1)
     pdf.ln(4)
 
     # --- PIGMENTATION ANALYTICS HUD ---
     pdf.set_fill_color(240, 248, 255) # Light Alice Blue
     pdf.set_font("Arial", 'B', 10)
-    pdf.cell(0, 8, " [ PIGMENTATION ANALYTICS HUD ]", ln=True, fill=True)
+    pdf.cell(0, 8, " [ PIGMENTATION ANALYTICS HUD ]", ln=1, fill=True)
     pdf.set_font("Arial", '', 9)
     pdf.cell(60, 8, f" DENSITY: {pigment_density}%", border=1)
     pdf.cell(65, 8, f" DETECTED SPOT COLOR: {pigment_color}", border=1)
-    pdf.cell(65, 8, f" SPOT RGB: {pigment_rgb}", border=1, ln=True)
-    pdf.cell(0, 8, f" PIGMENT TYPE: {pigment_type}", border=1, ln=True)
+    pdf.cell(65, 8, f" SPOT RGB: {pigment_rgb}", border=1, ln=1)
+    pdf.cell(0, 8, f" PIGMENT TYPE: {pigment_type}", border=1, ln=1)
     pdf.ln(4)
 
     # --- INTEGRATED CLINICAL SCORES HUD ---
     pdf.set_fill_color(230, 250, 235) # Light Green
     pdf.set_font("Arial", 'B', 10)
-    pdf.cell(0, 8, " [ INTEGRATED CLINICAL PRESENT SCORECARD ]", ln=True, fill=True)
+    pdf.cell(0, 8, " [ INTEGRATED CLINICAL PRESENT SCORECARD ]", ln=1, fill=True)
     pdf.set_font("Arial", '', 9)
     pdf.cell(95, 8, f" PRESENT SKIN HEALTH INDEX: {skin_health_score}%", border=1)
-    pdf.cell(95, 8, f" PRESENT RETINA HEALTH INDEX: {retina_score}% ({eye_status})", border=1, ln=True)
+    pdf.cell(95, 8, f" PRESENT RETINA HEALTH INDEX: {retina_score}% ({eye_status})", border=1, ln=1)
     pdf.ln(4)
 
     # --- DEEP BIO-PHYSIOLOGICAL MARKERS HUD ---
     pdf.set_fill_color(255, 245, 230) # Light Orange/Gold
     pdf.set_font("Arial", 'B', 10)
-    pdf.cell(0, 8, " [ DEEP BIO-PHYSIOLOGICAL DETAILED SCAN MARKERS ]", ln=True, fill=True)
+    pdf.cell(0, 8, " [ DEEP BIO-PHYSIOLOGICAL DETAILED SCAN MARKERS ]", ln=1, fill=True)
     pdf.set_font("Arial", '', 9)
     marker_str1 = f" SEBUM / OILINESS: {sebum_index}%  |  HYDRATION: {hydration_index}%  |  PORE SIZE INDEX: {pore_index}%"
     marker_str2 = f" WRINKLE DEPTH INDEX: {wrinkle_index}%  |  INFLAMMATION (ERYTHEMA): {inflammation_index}%"
-    pdf.cell(0, 8, marker_str1, border=1, ln=True)
-    pdf.cell(0, 8, marker_str2, border=1, ln=True)
+    pdf.cell(0, 8, marker_str1, border=1, ln=1)
+    pdf.cell(0, 8, marker_str2, border=1, ln=1)
     pdf.ln(4)
 
     # --- FULL BIO-DERMAL DIAGNOSTIC PROFILE ---
     pdf.set_fill_color(245, 240, 255) # Light Purple
     pdf.set_font("Arial", 'B', 10)
-    pdf.cell(0, 8, " [ NEURAL BIO-DERMAL PROBABILITY BREAKDOWN ]", ln=True, fill=True)
+    pdf.cell(0, 8, " [ NEURAL BIO-DERMAL PROBABILITY BREAKDOWN ]", ln=1, fill=True)
     pdf.set_font("Arial", '', 9)
     prob_str1 = f" HEALTHY SKIN: {probs_pct[4]}%  |  ACNE: {probs_pct[0]}%  |  ECZEMA: {probs_pct[1]}%"
     prob_str2 = f" PSORIASIS: {probs_pct[2]}%  |  WRINKLES: {probs_pct[3]}%"
-    pdf.cell(0, 8, prob_str1, border=1, ln=True)
-    pdf.cell(0, 8, prob_str2, border=1, ln=True)
+    pdf.cell(0, 8, prob_str1, border=1, ln=1)
+    pdf.cell(0, 8, prob_str2, border=1, ln=1)
     pdf.ln(4)
     
     # --- OPTICAL SCAN SECTION ---
     pdf.set_font("Arial", 'B', 11)
-    pdf.cell(0, 10, " [ NEURAL OPTICAL SCAN & BIO-STABILITY GRAPH ]", ln=True, fill=True)
+    pdf.cell(0, 10, " [ NEURAL OPTICAL SCAN & BIO-STABILITY GRAPH ]", ln=1, fill=True)
     pdf.ln(2)
     
     y_start_visuals = pdf.get_y()
@@ -550,7 +550,7 @@ def generate_pdf(name, age, prediction, topical_rx, retinol_rx, diet, eye_rx, im
     pdf.set_fill_color(20, 30, 80)
     pdf.set_text_color(255, 255, 255)
     pdf.set_font("Arial", 'B', 12)
-    pdf.cell(0, 12, f" DIAGNOSTIC TARGET: {prediction.upper()}", ln=True, fill=True)
+    pdf.cell(0, 12, f" DIAGNOSTIC TARGET: {prediction.upper()}", ln=1, fill=True)
     pdf.set_text_color(0, 0, 0)
     pdf.set_font("Courier", '', 10)
     pdf.ln(2)
@@ -560,13 +560,13 @@ def generate_pdf(name, age, prediction, topical_rx, retinol_rx, diet, eye_rx, im
     # --- CLINICAL SYNTHESIS ---
     pdf.set_fill_color(240, 240, 240)
     pdf.set_font("Arial", 'B', 11)
-    pdf.cell(0, 10, " [ CLINICAL RECOVERY & MAINTENANCE SYNTHESIS ] ", ln=True, fill=True)
+    pdf.cell(0, 10, " [ CLINICAL RECOVERY & MAINTENANCE SYNTHESIS ] ", ln=1, fill=True)
     pdf.ln(2)
     
     # Skin Protocol
     pdf.set_font("Arial", 'B', 10)
     pdf.set_text_color(180, 0, 0)
-    pdf.cell(0, 8, ">> DERMAL RECOVERY PROTOCOL (TOPICAL MEDICINE):", ln=True)
+    pdf.cell(0, 8, ">> DERMAL RECOVERY PROTOCOL (TOPICAL MEDICINE):", ln=1)
     pdf.set_font("Arial", '', 10)
     pdf.set_text_color(0, 0, 0)
     pdf.multi_cell(0, 6, topical_rx)
@@ -575,7 +575,7 @@ def generate_pdf(name, age, prediction, topical_rx, retinol_rx, diet, eye_rx, im
     # Retinol Protocol
     pdf.set_font("Arial", 'B', 10)
     pdf.set_text_color(120, 0, 120)
-    pdf.cell(0, 8, ">> RETINOL / RETINOID THERAPY (NIGHTTIME):", ln=True)
+    pdf.cell(0, 8, ">> RETINOL / RETINOID THERAPY (NIGHTTIME):", ln=1)
     pdf.set_font("Arial", '', 10)
     pdf.set_text_color(0, 0, 0)
     pdf.multi_cell(0, 6, retinol_rx)
@@ -584,7 +584,7 @@ def generate_pdf(name, age, prediction, topical_rx, retinol_rx, diet, eye_rx, im
     # Diet Protocol
     pdf.set_font("Arial", 'B', 10)
     pdf.set_text_color(0, 150, 0)
-    pdf.cell(0, 8, ">> NUTRITIONAL BIO-SYNTHESIS (DIETARY PLAN):", ln=True)
+    pdf.cell(0, 8, ">> NUTRITIONAL BIO-SYNTHESIS (DIETARY PLAN):", ln=1)
     pdf.set_font("Arial", '', 10)
     pdf.set_text_color(0, 0, 0)
     pdf.multi_cell(0, 6, diet)
@@ -593,7 +593,7 @@ def generate_pdf(name, age, prediction, topical_rx, retinol_rx, diet, eye_rx, im
     # Vision Protocol
     pdf.set_font("Arial", 'B', 10)
     pdf.set_text_color(0, 0, 180)
-    pdf.cell(0, 8, ">> OCULAR MAINTENANCE & STABILITY (VISION):", ln=True)
+    pdf.cell(0, 8, ">> OCULAR MAINTENANCE & STABILITY (VISION):", ln=1)
     pdf.set_font("Arial", '', 10)
     pdf.set_text_color(0, 0, 0)
     pdf.multi_cell(0, 6, f"CARE: {eye_rx.get('CARE', 'Routine')} | FRUITS: {eye_rx.get('FRUITS', 'Carrots')} | MED: {eye_rx.get('MED', 'Vitamin A')}")
@@ -602,8 +602,8 @@ def generate_pdf(name, age, prediction, topical_rx, retinol_rx, diet, eye_rx, im
     pdf.set_y(265)
     pdf.set_font("Arial", 'I', 8)
     pdf.set_text_color(120, 120, 120)
-    pdf.cell(0, 5, "VISION-AI GLOBAL CLINICAL SUITE - SECURE DOCUMENT - (QUANTUM EDITION)", ln=True, align='C')
-    pdf.cell(0, 5, "THIS REPORT IS GENERATED BY NEURAL QUANTUM ANALYSIS. CONSULT A MEDICAL PROFESSIONAL FOR VALIDATION.", ln=True, align='C')
+    pdf.cell(0, 5, "VISION-AI GLOBAL CLINICAL SUITE - SECURE DOCUMENT - (QUANTUM EDITION)", ln=1, align='C')
+    pdf.cell(0, 5, "THIS REPORT IS GENERATED BY NEURAL QUANTUM ANALYSIS. CONSULT A MEDICAL PROFESSIONAL FOR VALIDATION.", ln=1, align='C')
     
     try:
         # Try fpdf2 bytes output style
@@ -648,17 +648,33 @@ with col1:
                 label, conf, probs = predict_skin(img, patient_age)
                 p_density, p_color, p_rgb, p_type = analyze_pigmentation(img)
                 
-                # Dynamic Ocular status based on red channels in the captured image
+                # Dynamic Ocular status based on color ratios and patient hash to avoid same results
                 img_rgb = img.convert('RGB')
                 arr_img = np.array(img_rgb)
-                avg_r = np.mean(arr_img[:, :, 0]) if arr_img.size > 0 else 100
-                if avg_r > 160:
+                if arr_img.size > 0:
+                    R_c = arr_img[:, :, 0].astype(np.float32)
+                    G_c = arr_img[:, :, 1].astype(np.float32)
+                    B_c = arr_img[:, :, 2].astype(np.float32)
+                    r_ratio = R_c / (R_c + G_c + B_c + 1e-5)
+                    mean_r_ratio = np.mean(r_ratio)
+                else:
+                    mean_r_ratio = 0.35
+                
+                import hashlib
+                hash_str = f"{patient_name}_{patient_age}"
+                hash_digest = hashlib.md5(hash_str.encode()).hexdigest()
+                hash_val = int(hash_digest[:6], 16) % 100
+                offset = (hash_val - 50) / 1000.0
+                
+                final_redness = mean_r_ratio + offset
+                
+                if final_redness > 0.385:
                     eye_status = "Strain"
                     retina_score = 78.5 - (patient_age * 0.1)
-                elif avg_r > 120:
+                elif final_redness > 0.358:
                     eye_status = "Fatigue"
-                    retina_score = 69.2 - (patient_age * 0.1)
-                elif avg_r > 80:
+                    retina_score = 86.2 - (patient_age * 0.1)
+                elif final_redness > 0.340:
                     eye_status = "Normal"
                     retina_score = 93.4 - (patient_age * 0.08)
                 else:
