@@ -24,7 +24,7 @@ EYE_PRESCRIPTIONS = {
     "Optimal": {"FRUITS": "Goji Berries", "MED": "Omega-3", "CARE": "Schedule yearly preventative check-up"}
 }
 
-def get_clinical_plan(prediction, age):
+def get_clinical_plan(prediction, age, pigment_type, pigment_density):
     # Determine the focus/advice based on age group
     if age < 20:
         age_focus = "Teens & Youth: Focus on sebum control, hydration, and skin barrier protection. Harsh retinoids are NOT recommended."
@@ -82,7 +82,45 @@ def get_clinical_plan(prediction, age):
         else: # Healthy Skin
             topical_treatment = "Gentle milky cleansers, Squalane oil, and rich Ceramide creams to seal moisture."
 
+    # Integrate Pigmentation specific treatments
+    if pigment_density > 2.5:
+        if "Redness" in pigment_type or "Inflammatory" in pigment_type:
+            topical_treatment += " To address the detected Erythemic Redness, introduce Azelaic Acid 10% or Centella Asiatica (Cica) balm to calm vascular inflammation."
+        elif "Melanin" in pigment_type or "Freckle" in pigment_type:
+            topical_treatment += " To address the detected Melanin Hyperpigmentation/Spots, incorporate Kojic Acid 1% or Alpha Arbutin 2% morning and night. Ensure strict daily application of SPF 50+ to prevent further UV-induced dark spots."
+        elif "Sebaceous" in pigment_type:
+            topical_treatment += " To address the detected Sebaceous Pigmentation, integrate a Zinc PCA 1% + Niacinamide 10% serum to reduce sebum oxidation and clear localized discoloration."
+        else:
+            topical_treatment += " To address the detected deep dermal shadowing, use Glycolic Acid (AHA) exfoliants twice a week to accelerate cellular turnover and fade spots."
+            
+        # Retinoid enhancement for hyperpigmentation
+        if "Melanin" in pigment_type or "Freckle" in pigment_type:
+            if age >= 20:
+                retinol_treatment += " Note: Your nighttime retinoid will act synergistically with tyrosinase inhibitors (like Alpha Arbutin) to accelerate pigment dispersion and cell turnover."
+            else:
+                retinol_treatment += " Note: For young skin with pigment spots, Bakuchiol is preferred over Retinol to fade spots without causing post-inflammatory hyperpigmentation (PIH) from irritation."
+                
     return age_focus, topical_treatment, retinol_treatment
+
+def get_diet_plan(prediction, pigment_type, pigment_density):
+    # Base diets
+    base_diet = DIETS.get(prediction, "Balanced diet with clean whole foods.")
+    
+    # Pigmentation specific nutritional enhancements
+    pigment_enhancement = ""
+    if pigment_density > 2.5:
+        if "Redness" in pigment_type or "Inflammatory" in pigment_type:
+            pigment_enhancement = " ANTI-INFLAMMATORY FOCUS: Increase Omega-3 fatty acids (salmon, chia seeds) and consume turmeric or green tea to calm vascular redness. Avoid spicy foods and hot beverages."
+        elif "Melanin" in pigment_type or "Freckle" in pigment_type:
+            pigment_enhancement = " SKIN BRIGHTENING DIET: Consume high Vitamin C (citrus, bell peppers) and Vitamin E (almonds, sunflower seeds) to naturally inhibit melanin production. Add tomatoes (lycopene) for photo-protection."
+        elif "Sebaceous" in pigment_type:
+            pigment_enhancement = " SEBUM REGULATION DIET: Incorporate foods rich in Zinc (pumpkin seeds, lentils) and Vitamin A (sweet potatoes, carrots) to regulate oil production and prevent pore clogging."
+        else:
+            pigment_enhancement = " DETOXIFICATION & BARRIER FOCUS: Hydrate with 3L of water daily and increase antioxidant-rich berries to support deep dermal recovery."
+    else:
+        pigment_enhancement = " MAINTAIN TONE: Incorporate a daily antioxidant-rich green juice (spinach, cucumber, celery) to maintain uniform skin radiance."
+        
+    return f"{base_diet} {pigment_enhancement}"
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
 
@@ -736,11 +774,11 @@ def display_dashboard(model, image_path, name="Guest", age=25, eye_data=False):
         skin_health_score = round(np.clip(skin_health_score, 15.0, 99.0), 1)
         
         # Unified Diagnostic Calculations (Dynamic health status)
-        skin_food = DIETS.get(prediction, "Antioxidant rich diet")
+        skin_food = get_diet_plan(prediction, p_type, p_density)
         eye_rx_data = EYE_PRESCRIPTIONS.get(eye_status, EYE_PRESCRIPTIONS["Normal"])
         
-        # Compute age-sensitive dermal plan
-        age_focus, topical_rx, retinol_rx = get_clinical_plan(prediction, age)
+        # Compute age-sensitive dermal plan with pigmentation adjustments
+        age_focus, topical_rx, retinol_rx = get_clinical_plan(prediction, age, p_type, p_density)
         
         # Age-Based Clinical Logic for Projection
         if age < 18:
