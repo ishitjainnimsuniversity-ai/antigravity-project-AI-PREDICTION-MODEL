@@ -81,7 +81,7 @@ EYE_PRESCRIPTIONS = {
     "Optimal": {"FRUITS": "Goji Berries", "MED": "Omega-3", "CARE": "Schedule yearly preventative check-up"}
 }
 
-def get_clinical_plan(prediction, age):
+def get_clinical_plan(prediction, age, pigment_type, pigment_density):
     # Determine the focus/advice based on age group
     if age < 20:
         age_focus = "Teens & Youth: Focus on sebum control, hydration, and skin barrier protection. Harsh retinoids are NOT recommended."
@@ -139,7 +139,45 @@ def get_clinical_plan(prediction, age):
         else: # Healthy Skin
             topical_treatment = "Gentle milky cleansers, Squalane oil, and rich Ceramide creams to seal moisture."
 
+    # Integrate Pigmentation specific treatments
+    if pigment_density > 2.5:
+        if "Redness" in pigment_type or "Inflammatory" in pigment_type:
+            topical_treatment += " To address the detected Erythemic Redness, introduce Azelaic Acid 10% or Centella Asiatica (Cica) balm to calm vascular inflammation."
+        elif "Melanin" in pigment_type or "Freckle" in pigment_type:
+            topical_treatment += " To address the detected Melanin Hyperpigmentation/Spots, incorporate Kojic Acid 1% or Alpha Arbutin 2% morning and night. Ensure strict daily application of SPF 50+ to prevent further UV-induced dark spots."
+        elif "Sebaceous" in pigment_type:
+            topical_treatment += " To address the detected Sebaceous Pigmentation, integrate a Zinc PCA 1% + Niacinamide 10% serum to reduce sebum oxidation and clear localized discoloration."
+        else:
+            topical_treatment += " To address the detected deep dermal shadowing, use Glycolic Acid (AHA) exfoliants twice a week to accelerate cellular turnover and fade spots."
+            
+        # Retinoid enhancement for hyperpigmentation
+        if "Melanin" in pigment_type or "Freckle" in pigment_type:
+            if age >= 20:
+                retinol_treatment += " Note: Your nighttime retinoid will act synergistically with tyrosinase inhibitors (like Alpha Arbutin) to accelerate pigment dispersion and cell turnover."
+            else:
+                retinol_treatment += " Note: For young skin with pigment spots, Bakuchiol is preferred over Retinol to fade spots without causing post-inflammatory hyperpigmentation (PIH) from irritation."
+                
     return age_focus, topical_treatment, retinol_treatment
+
+def get_diet_plan(prediction, pigment_type, pigment_density):
+    # Base diets
+    base_diet = DIETS.get(prediction, "Balanced diet with clean whole foods.")
+    
+    # Pigmentation specific nutritional enhancements
+    pigment_enhancement = ""
+    if pigment_density > 2.5:
+        if "Redness" in pigment_type or "Inflammatory" in pigment_type:
+            pigment_enhancement = " ANTI-INFLAMMATORY FOCUS: Increase Omega-3 fatty acids (salmon, chia seeds) and consume turmeric or green tea to calm vascular redness. Avoid spicy foods and hot beverages."
+        elif "Melanin" in pigment_type or "Freckle" in pigment_type:
+            pigment_enhancement = " SKIN BRIGHTENING DIET: Consume high Vitamin C (citrus, bell peppers) and Vitamin E (almonds, sunflower seeds) to naturally inhibit melanin production. Add tomatoes (lycopene) for photo-protection."
+        elif "Sebaceous" in pigment_type:
+            pigment_enhancement = " SEBUM REGULATION DIET: Incorporate foods rich in Zinc (pumpkin seeds, lentils) and Vitamin A (sweet potatoes, carrots) to regulate oil production and prevent pore clogging."
+        else:
+            pigment_enhancement = " DETOXIFICATION & BARRIER FOCUS: Hydrate with 3L of water daily and increase antioxidant-rich berries to support deep dermal recovery."
+    else:
+        pigment_enhancement = " MAINTAIN TONE: Incorporate a daily antioxidant-rich green juice (spinach, cucumber, celery) to maintain uniform skin radiance."
+        
+    return f"{base_diet} {pigment_enhancement}"
 
 IMG_SIZE = 128
 DEFAULT_MODEL_PATH = "trained_skin_model.keras"
@@ -603,8 +641,9 @@ with col2:
         # Treatment & Diet
         tab1, tab2, tab3 = st.tabs(["💊 Treatment", "🥗 Nutrition", "📈 Bio-Forecast"])
         
-        # Compute age-sensitive dermal plan
-        age_focus, topical_rx, retinol_rx = get_clinical_plan(label, patient_age)
+        # Compute age-sensitive dermal plan with pigmentation adjustments
+        age_focus, topical_rx, retinol_rx = get_clinical_plan(label, patient_age, p_type, p_density)
+        dynamic_diet = get_diet_plan(label, p_type, p_density)
         
         with tab1:
             st.markdown(f"### 🎯 Age Focus")
@@ -616,7 +655,7 @@ with col2:
             st.warning("Note: Always consult a certified dermatologist before starting active ingredients.")
         
         with tab2:
-            st.write(f"**Nutritional Strategy:** {DIETS.get(label)}")
+            st.write(f"**Nutritional Strategy:** {dynamic_diet}")
         
         with tab3:
             # 10-Year Forecast Plot
@@ -671,7 +710,7 @@ with col2:
                 prediction=label,
                 topical_rx=topical_rx,
                 retinol_rx=retinol_rx,
-                diet=DIETS.get(label),
+                diet=dynamic_diet,
                 eye_rx=eye_rx,
                 img=img,
                 plot_buf=pdf_plot_buf,
@@ -696,7 +735,7 @@ with col2:
                 )
             with btn_col2:
                 probs_pct_str = ", ".join([f"{SKIN_CLASSES[k]}: {round(float(probs[k])*100.0, 1)}%" for k in range(len(SKIN_CLASSES))])
-                report_text = f"Patient: {patient_name}\nAge: {patient_age}\nDiagnosis: {label}\nConfidence: {conf:.1f}%\n\nPresent Skin Health Index: {skin_health_score}%\nPresent Retina Health Index: {retina_score}% ({eye_status})\n\nSkin Conditions Probability Profile:\n{probs_pct_str}\n\nPigment Level: {p_density}%\nPigment Color: {p_color} {p_rgb}\nPigment Type: {p_type}\n\nAge Focus: {age_focus}\n\nTopical Protocol: {topical_rx}\n\nRetinoid Therapy: {retinol_rx}\n\nDiet Strategy: {DIETS.get(label)}"
+                report_text = f"Patient: {patient_name}\nAge: {patient_age}\nDiagnosis: {label}\nConfidence: {conf:.1f}%\n\nPresent Skin Health Index: {skin_health_score}%\nPresent Retina Health Index: {retina_score}% ({eye_status})\n\nSkin Conditions Probability Profile:\n{probs_pct_str}\n\nPigment Level: {p_density}%\nPigment Color: {p_color} {p_rgb}\nPigment Type: {p_type}\n\nAge Focus: {age_focus}\n\nTopical Protocol: {topical_rx}\n\nRetinoid Therapy: {retinol_rx}\n\nDiet Strategy: {dynamic_diet}"
                 st.download_button(
                     label="📥 Download Report (TXT)",
                     data=report_text,
