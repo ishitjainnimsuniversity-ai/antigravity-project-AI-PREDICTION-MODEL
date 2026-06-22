@@ -122,6 +122,68 @@ def get_diet_plan(prediction, pigment_type, pigment_density):
         
     return f"{base_diet} {pigment_enhancement}"
 
+def extract_biomarkers(img, label):
+    img = img.convert('RGB')
+    arr = np.array(img, dtype=np.float32)
+    R = arr[:, :, 0]
+    G = arr[:, :, 1]
+    B = arr[:, :, 2]
+    
+    skin_mask = (R > 95) & (G > 40) & (B > 20) & (R > G) & (R > B) & (np.abs(R - G) > 15)
+    if np.sum(skin_mask) < 100:
+        skin_mask = np.ones_like(R, dtype=bool)
+        
+    R_skin = R[skin_mask]
+    G_skin = G[skin_mask]
+    B_skin = B[skin_mask]
+    lum_skin = 0.299 * R_skin + 0.587 * G_skin + 0.114 * B_skin
+    
+    # Redness
+    total_val = R_skin + G_skin + B_skin + 1e-5
+    r_ratio = R_skin / total_val
+    red_spots_ratio = np.sum(r_ratio > 0.38) / len(r_ratio) if len(r_ratio) > 0 else 0.0
+    
+    # Gradients & Variance
+    gray = img.convert('L')
+    gray_arr = np.array(gray, dtype=np.float32)
+    grad_x = np.abs(gray_arr[:, 1:] - gray_arr[:, :-1])
+    grad_y = np.abs(gray_arr[1:, :] - gray_arr[:-1, :])
+    mean_grad = np.mean(grad_x) + np.mean(grad_y)
+    std_dev = np.std(gray_arr)
+    
+    # 1. Sebum (Oiliness) Index
+    sebum_count = np.sum(lum_skin > 210)
+    sebum_index = (sebum_count / len(lum_skin)) * 100.0 if len(lum_skin) > 0 else 0
+    sebum_index = round(15.0 + (sebum_index * 3.5), 1)
+    sebum_index = min(sebum_index, 95.0)
+    
+    # 2. Hydration Index
+    hydration_index = 98.0 - (std_dev * 0.4) - (mean_grad * 1.2)
+    if label == "Eczema" or label == "Psoriasis":
+        hydration_index -= 25.0
+    hydration_index = round(max(hydration_index, 10.0), 1)
+    
+    # 3. Pore Index
+    pore_index = 10.0 + (mean_grad * 0.8) + (np.sum((lum_skin > 120) & (lum_skin < 170)) / len(lum_skin)) * 40.0 if len(lum_skin) > 0 else 10.0
+    if label == "Acne":
+        pore_index += 20.0
+    pore_index = round(np.clip(pore_index, 10.0, 92.0), 1)
+    
+    # 4. Wrinkle Index
+    wrinkle_index = (mean_grad * 1.5) + (std_dev * 0.2)
+    if label == "Wrinkles":
+        wrinkle_index += 35.0
+    wrinkle_index = round(np.clip(wrinkle_index, 5.0, 96.0), 1)
+    
+    # 5. Inflammation Index
+    avg_red_ratio = np.mean(R_skin / (R_skin + G_skin + B_skin + 1e-5)) if len(R_skin) > 0 else 0.33
+    inflammation_index = (red_spots_ratio * 120.0) + (avg_red_ratio * 10.0)
+    if label in ["Acne", "Eczema", "Psoriasis"]:
+        inflammation_index += 15.0
+    inflammation_index = round(np.clip(inflammation_index, 5.0, 98.0), 1)
+    
+    return sebum_index, hydration_index, pore_index, wrinkle_index, inflammation_index
+
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
 
 try:
@@ -596,7 +658,7 @@ def run_real_time_webcam(model, patient_name="Guest", age=25):
     cap.release()
     cv2.destroyAllWindows()
 
-def generate_clinical_pdf(name, age, prediction, topical_rx, retinol_rx, diet, eye_rx, image_path, plot_path=None, pigment_density=1.8, pigment_color="Balanced Tan", pigment_rgb="(128, 128, 128)", pigment_type="Uniform Melanin Tone", skin_health_score=85.0, eye_status="Normal", retina_score=94.2, probs_pct=None):
+def generate_clinical_pdf(name, age, prediction, topical_rx, retinol_rx, diet, eye_rx, image_path, plot_path=None, pigment_density=1.8, pigment_color="Balanced Tan", pigment_rgb="(128, 128, 128)", pigment_type="Uniform Melanin Tone", skin_health_score=85.0, eye_status="Normal", retina_score=94.2, probs_pct=None, sebum_index=45.0, hydration_index=75.0, pore_index=30.0, wrinkle_index=20.0, inflammation_index=15.0):
     """Generates a futuristic 'Sci-Fi' clinical PDF report with integrated Graph and Scans."""
     from datetime import datetime
     import os
@@ -647,6 +709,17 @@ def generate_clinical_pdf(name, age, prediction, topical_rx, retinol_rx, diet, e
     pdf.set_font("Arial", '', 9)
     pdf.cell(95, 8, f" PRESENT SKIN HEALTH INDEX: {skin_health_score}%", border=1)
     pdf.cell(95, 8, f" PRESENT RETINA HEALTH INDEX: {retina_score}% ({eye_status})", border=1, ln=True)
+    pdf.ln(4)
+
+    # --- DEEP BIO-PHYSIOLOGICAL MARKERS HUD ---
+    pdf.set_fill_color(255, 245, 230) # Light Orange/Gold
+    pdf.set_font("Arial", 'B', 10)
+    pdf.cell(0, 8, " [ DEEP BIO-PHYSIOLOGICAL DETAILED SCAN MARKERS ]", ln=True, fill=True)
+    pdf.set_font("Arial", '', 9)
+    marker_str1 = f" SEBUM / OILINESS: {sebum_index}%  |  HYDRATION: {hydration_index}%  |  PORE SIZE INDEX: {pore_index}%"
+    marker_str2 = f" WRINKLE DEPTH INDEX: {wrinkle_index}%  |  INFLAMMATION (ERYTHEMA): {inflammation_index}%"
+    pdf.cell(0, 8, marker_str1, border=1, ln=True)
+    pdf.cell(0, 8, marker_str2, border=1, ln=True)
     pdf.ln(4)
 
     # --- FULL BIO-DERMAL DIAGNOSTIC PROFILE ---
@@ -773,6 +846,9 @@ def display_dashboard(model, image_path, name="Guest", age=25, eye_data=False):
             skin_health_score -= 15.0
         skin_health_score = round(np.clip(skin_health_score, 15.0, 99.0), 1)
         
+        # Extract deep biological markers
+        seb, hyd, por, wrn, inf = extract_biomarkers(original_img, prediction)
+        
         # Unified Diagnostic Calculations (Dynamic health status)
         skin_food = get_diet_plan(prediction, p_type, p_density)
         eye_rx_data = EYE_PRESCRIPTIONS.get(eye_status, EYE_PRESCRIPTIONS["Normal"])
@@ -882,7 +958,12 @@ def display_dashboard(model, image_path, name="Guest", age=25, eye_data=False):
             skin_health_score=skin_health_score,
             eye_status=eye_status,
             retina_score=retina_score,
-            probs_pct=probs_pct
+            probs_pct=probs_pct,
+            sebum_index=seb,
+            hydration_index=hyd,
+            pore_index=por,
+            wrinkle_index=wrn,
+            inflammation_index=inf
         )
         
     except Exception as e:
