@@ -751,6 +751,29 @@ with col2:
         age_focus, topical_rx, retinol_rx = get_clinical_plan(label, patient_age, p_type, p_density)
         dynamic_diet = get_diet_plan(label, p_type, p_density)
         
+        # 10-Year Forecast Calculations
+        aging_factor = 1.0 if patient_age < 18 else (1.5 if patient_age < 35 else (2.2 if patient_age < 55 else 3.5))
+        decay_constant = 0.5 if label == "Healthy Skin" else 2.5
+        vulnerability_score = (aging_factor * decay_constant)
+        
+        years = np.arange(2026, 2037)
+        unmanaged_scores = []
+        optimized_scores = []
+        for i in range(11):
+            fluctuation = 1.2 * np.sin(i * 1.8)
+            val_unmanaged = skin_health_score - (i * vulnerability_score) + fluctuation
+            unmanaged_scores.append(np.clip(val_unmanaged, 15.0, 100.0))
+            
+            if i == 0:
+                val_opt = skin_health_score
+            elif i == 1:
+                val_opt = skin_health_score + (94.0 - skin_health_score) * 0.6 + fluctuation
+            elif i == 2:
+                val_opt = skin_health_score + (94.0 - skin_health_score) * 0.95 + fluctuation
+            else:
+                val_opt = 94.0 - ((i - 2) * vulnerability_score * 0.22) + fluctuation
+            optimized_scores.append(np.clip(val_opt, 15.0, 99.0))
+            
         with tab1:
             st.markdown(f"### 🎯 Age Focus")
             st.info(age_focus)
@@ -765,21 +788,18 @@ with col2:
         
         with tab3:
             # 10-Year Forecast Plot
-            aging_factor = 1.0 if patient_age < 18 else (1.5 if patient_age < 35 else (2.2 if patient_age < 55 else 3.5))
-            decay_constant = 0.5 if label == "Healthy Skin" else 2.5
-            vulnerability_score = (aging_factor * decay_constant)
-            
-            years = np.arange(2026, 2037)
-            health_scores = 100 - (np.arange(11) * vulnerability_score)
-            health_scores = np.clip(health_scores, 0, 100)
-            
             fig, ax = plt.subplots(facecolor='none')
-            ax.plot(years, health_scores, color='#00d2ff', marker='o', linewidth=2)
-            ax.fill_between(years, health_scores, 0, color='#00d2ff', alpha=0.2)
-            ax.set_title("10-Year Bio-Stability Projection", color='white')
+            ax.plot(years, unmanaged_scores, color='#ff4d4d', marker='o', label='Unmanaged Path', linewidth=2)
+            ax.plot(years, optimized_scores, color='#00ffcc', marker='s', label='With Active Treatment', linewidth=2)
+            ax.fill_between(years, optimized_scores, unmanaged_scores, color='#00ffcc', alpha=0.1)
+            ax.fill_between(years, unmanaged_scores, 0, color='#ff4d4d', alpha=0.05)
+            
+            ax.set_title("10-Year Bio-Stability Projection", color='white', fontweight='bold')
             ax.set_xlabel("Year", color='white')
             ax.set_ylabel("Stability %", color='white')
             ax.tick_params(colors='white')
+            ax.legend(facecolor='#1e1e1e', edgecolor='white', labelcolor='white')
+            ax.set_ylim(0, 110)
             for spine in ax.spines.values():
                 spine.set_edgecolor('white')
             
@@ -794,13 +814,17 @@ with col2:
             
             # Generate PDF plot (white background, dark labels for contrast in PDF)
             pdf_fig, pdf_ax = plt.subplots(figsize=(6, 4))
-            pdf_ax.plot(years, health_scores, color='#004e92', marker='o', linewidth=2)
-            pdf_ax.fill_between(years, health_scores, 0, color='#004e92', alpha=0.2)
+            pdf_ax.plot(years, unmanaged_scores, color='#d32f2f', marker='o', label='Unmanaged Path', linewidth=2)
+            pdf_ax.plot(years, optimized_scores, color='#00796b', marker='s', label='With Active Treatment', linewidth=2)
+            pdf_ax.fill_between(years, optimized_scores, unmanaged_scores, color='#00796b', alpha=0.1)
+            pdf_ax.fill_between(years, unmanaged_scores, 0, color='#d32f2f', alpha=0.05)
             pdf_ax.set_title("10-Year Bio-Stability Projection", color='black', fontweight='bold')
             pdf_ax.set_xlabel("Year", color='black')
             pdf_ax.set_ylabel("Stability %", color='black')
             pdf_ax.tick_params(colors='black')
+            pdf_ax.legend()
             pdf_ax.grid(True, alpha=0.3)
+            pdf_ax.set_ylim(0, 110)
             
             pdf_plot_buf = io.BytesIO()
             pdf_fig.savefig(pdf_plot_buf, format='png', bbox_inches='tight', dpi=150)
