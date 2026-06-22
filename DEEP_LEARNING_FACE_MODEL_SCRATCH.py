@@ -934,15 +934,35 @@ def display_dashboard(model, image_path, name="Guest", age=25, eye_data=False):
         
         decay_constant = 0.5 if prediction == "Healthy Skin" else 2.5
         vulnerability_score = (aging_factor * decay_constant)
-        health_skin = 100 - (np.arange(11) * vulnerability_score)
         
-        ax4.plot(years, health_skin, label='Bio-Stability Projection', color='#ff6600', lw=2, marker='o', markersize=4)
-        ax4.fill_between(years, health_skin, 0, alpha=0.1, color='#ff6600')
+        unmanaged_scores = []
+        optimized_scores = []
+        for i in range(11):
+            fluctuation = 1.2 * np.sin(i * 1.8)
+            val_unmanaged = skin_health_score - (i * vulnerability_score) + fluctuation
+            unmanaged_scores.append(np.clip(val_unmanaged, 15.0, 100.0))
+            
+            if i == 0:
+                val_opt = skin_health_score
+            elif i == 1:
+                val_opt = skin_health_score + (94.0 - skin_health_score) * 0.6 + fluctuation
+            elif i == 2:
+                val_opt = skin_health_score + (94.0 - skin_health_score) * 0.95 + fluctuation
+            else:
+                val_opt = 94.0 - ((i - 2) * vulnerability_score * 0.22) + fluctuation
+            optimized_scores.append(np.clip(val_opt, 15.0, 99.0))
+            
+        ax4.plot(years, unmanaged_scores, label='Unmanaged Path', color='#df0000', lw=2, marker='o', markersize=4)
+        ax4.plot(years, optimized_scores, label='With Active Treatment', color='green', lw=2, marker='s', markersize=4)
+        ax4.fill_between(years, optimized_scores, unmanaged_scores, color='green', alpha=0.1)
+        ax4.fill_between(years, unmanaged_scores, 0, color='#df0000', alpha=0.05)
+        
         ax4.set_title(f"10-Yr Bio-Forecast (Risk Factor: {vulnerability_score:.1f})", fontweight='bold')
         ax4.set_xlabel("Predicted Timeline (Years)")
         ax4.set_ylabel("Bio-Stability Score (%)")
-        ax4.set_ylim(0, 105)
+        ax4.set_ylim(0, 110)
         ax4.grid(True, alpha=0.3)
+        ax4.legend()
         
         # Global Footer
         info_text = f"🛡️ SYSTEM: ULTRA-ACCURACY ENGINE | 🧬 CAPTURE: {os.path.basename(image_path)} | MODE: {name.upper()}'s CUSTOM PROFILE"
