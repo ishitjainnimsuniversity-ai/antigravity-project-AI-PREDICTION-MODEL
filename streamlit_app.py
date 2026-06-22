@@ -324,6 +324,52 @@ def correct_white_balance(img, custom_ref_rgb=None):
         return img
 
 
+def is_image_blurry(img, threshold=100.0):
+    """
+    Checks if the input image is blurry using the variance of the Laplacian method.
+    Calculates the focus measure of the captured image by convolving it with
+    the Laplacian operator and computing the variance.
+    Returns (is_blurry, variance_score).
+    """
+    if cv2 is None:
+        return False, 999.0
+    try:
+        img_np = np.array(img.convert('RGB'))
+        gray = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
+        # Compute the Laplacian variance (focus measure)
+        laplacian_var = cv2.Laplacian(gray, cv2.CV_64F).var()
+        is_blurry = laplacian_var < threshold
+        return is_blurry, laplacian_var
+    except Exception:
+        return False, 999.0
+
+
+def apply_clahe(img, clip_limit=2.0, tile_grid_size=(8, 8)):
+    """
+    Applies Contrast Limited Adaptive Histogram Equalization (CLAHE)
+    to enhance local contrast of the image, making micro-structures
+    like wrinkles and skin texture much more visible.
+    """
+    if cv2 is None:
+        return img
+    try:
+        img_np = np.array(img.convert('RGB'))
+        # Convert to LAB color space to modify luminance channel only (L)
+        lab = cv2.cvtColor(img_np, cv2.COLOR_RGB2LAB)
+        l, a, b = cv2.split(lab)
+        
+        # Apply CLAHE to L-channel
+        clahe = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=tile_grid_size)
+        cl = clahe.apply(l)
+        
+        # Merge back and convert to RGB
+        limg = cv2.merge((cl, a, b))
+        enhanced = cv2.cvtColor(limg, cv2.COLOR_LAB2RGB)
+        return Image.fromarray(enhanced)
+    except Exception:
+        return img
+
+
 def download_face_landmarker_model():
     if not os.path.exists(MODEL_PATH):
         try:
@@ -1615,6 +1661,21 @@ def generate_clinical_pdf(name, age, prediction, clinical_data, age_focus,
     pdf.set_font("Arial", '', 8.5)
     pdf.cell(95, 7, f" SKIN HEALTH INDEX: {skin_health_score}%", border=1)
     pdf.cell(95, 7, f" OCULAR COMFORT INDEX: {retina_score}% ({eye_status})", border=1, ln=1)
+    
+    # Image preprocessing & quality check
+    is_blurry = clinical_data.get("is_blurry", False)
+    blur_score = clinical_data.get("blur_score", 999.0)
+    use_clahe = clinical_data.get("use_clahe", False)
+    
+    if blur_score == 999.0:
+        quality_str = "NOT CHECKED"
+    else:
+        quality_str = f"WARNING (Laplacian Var: {blur_score:.1f})" if is_blurry else f"PASSED (Laplacian Var: {blur_score:.1f})"
+    
+    clahe_str = "ACTIVE (CLAHE Enhanced)" if use_clahe else "STANDARD (Disabled)"
+    
+    pdf.cell(95, 7, f" IMAGE FOCUS VERIFICATION: {quality_str}", border=1)
+    pdf.cell(95, 7, f" ADVANCED CONTRAST: {clahe_str}", border=1, ln=1)
     pdf.ln(3)
 
     # VISUALS (2x2 grid: face, thermal, uv, plot) - PLACED PROMINENTLY ON PAGE 1
@@ -1900,11 +1961,18 @@ with col1:
         img = Image.open(captured_image)
         st.image(img, caption="Captured Image Baseline", use_container_width=True)
 
-        # Color calibration options
+        # Color calibration & Quality options
         st.markdown("---")
-        st.markdown("**🎨 Image Pre-Processing & Calibration**")
-        use_calibration = st.checkbox("Enable Strict Color Calibration (White Balance Correction)", value=True)
+        st.markdown("**🎨 Advanced Image Pre-Processing & Quality Controls**")
         
+        pre_col1, pre_col2 = st.columns(2)
+        with pre_col1:
+            use_calibration = st.checkbox("Enable Strict Color Calibration", value=True, help="Corrects white balance under gray-world or manual references.")
+            use_clahe = st.checkbox("Enable Advanced Contrast Enhancement (CLAHE)", value=False, help="Uses Contrast Limited Adaptive Histogram Equalization to make micro-wrinkles/textures clearer.")
+        with pre_col2:
+            use_blur_check = st.checkbox("Enable Advanced Focus Analyzer", value=True, help="Detects image blur automatically using Laplacian Variance.")
+            blur_threshold = st.slider("Focus Sensitivity (Threshold)", min_value=10.0, max_value=300.0, value=100.0, step=5.0, help="Lower values are more lenient (allow blurrier photos); higher values require extremely sharp focus.")
+
         custom_ref_rgb = None
         if use_calibration:
             calibration_mode = st.radio("Calibration Method", ["Automatic (Gray-World)", "Manual Reference Card"])
@@ -1927,8 +1995,28 @@ with col1:
                     if 'calibrated_image' in st.session_state:
                         del st.session_state['calibrated_image']
 
+                # Apply Advanced Contrast Enhancement (CLAHE) if selected
+                if use_clahe:
+                    processed_img = apply_clahe(processed_img)
+                    st.session_state['clahe_image'] = processed_img
+                else:
+                    if 'clahe_image' in st.session_state:
+                        del st.session_state['clahe_image']
+
+                # Run Advanced Laplacian Focus Check
+                is_blurry = False
+                blur_score = 999.0
+                if use_blur_check:
+                    is_blurry, blur_score = is_image_blurry(processed_img, blur_threshold)
+
                 # Full clinical analysis (using MediaPipe Face Mesh internally)
                 clinical_data = full_dermatological_analysis(processed_img)
+                
+                # Inject quality & enhancement metadata into clinical_data for PDF and UI
+                clinical_data["is_blurry"] = is_blurry
+                clinical_data["blur_score"] = blur_score
+                clinical_data["blur_threshold"] = blur_threshold
+                clinical_data["use_clahe"] = use_clahe
 
                 # Store the skin mask overlay in session state
                 st.session_state['skin_mask'] = clinical_data['is_mediapipe'] # We'll compute overlay on the fly
@@ -1984,7 +2072,11 @@ with col1:
                     "img": processed_img, "original_img": img, "clinical_data": clinical_data,
                     "skin_health_score": skin_health_score,
                     "eye_status": eye_status, "retina_score": retina_score,
-                    "iga_score": iga_score, "glogau_score": glogau_score
+                    "iga_score": iga_score, "glogau_score": glogau_score,
+                    "is_blurry": is_blurry if use_blur_check else False,
+                    "blur_score": blur_score if use_blur_check else 999.0,
+                    "blur_threshold": blur_threshold if use_blur_check else 100.0,
+                    "use_clahe": use_clahe
                 }
                 st.session_state['should_speak'] = True
 
@@ -1992,10 +2084,22 @@ with col1:
         if 'calibrated_image' in st.session_state:
             st.image(st.session_state['calibrated_image'], caption="Calibrated (White Balance Corrected)", use_container_width=True)
 
+        if 'clahe_image' in st.session_state:
+            st.image(st.session_state['clahe_image'], caption="Advanced Medical Contrast Enhanced (CLAHE)", use_container_width=True)
+
         if 'diagnosis' in st.session_state:
             diag_store = st.session_state['diagnosis']
             raw_img = diag_store["original_img"]
             cd_store = diag_store["clinical_data"]
+            
+            # Quality & Enhancement Indicators
+            if diag_store.get("is_blurry"):
+                st.warning(f"⚠️ **Image Focus Warning (Laplacian Variance: {diag_store['blur_score']:.1f} / Threshold: {diag_store['blur_threshold']:.1f})**: The uploaded image appears blurry. For highly accurate micro-texture (GLCM/LBP) and wrinkle depth analysis, please capture a sharp, high-resolution photo under good lighting.")
+            elif diag_store.get("blur_score", 999.0) != 999.0:
+                st.success(f"✅ **Focus Verification Passed (Laplacian Variance: {diag_store['blur_score']:.1f} / Threshold: {diag_store['blur_threshold']:.1f})**: Image focus is optimal for detailed epidermal analysis.")
+
+            if diag_store.get("use_clahe"):
+                st.info("💡 **Contrast Limited Adaptive Histogram Equalization (CLAHE) Active**: Local skin contrast enhanced. Micro-wrinkle boundaries and pore structures amplified.")
             
             # Trigger client-side voice guide summary once on complete
             if st.session_state.get('should_speak') and enable_voice:
