@@ -1268,10 +1268,11 @@ def generate_clinical_pdf(name, age, prediction, clinical_data, age_focus,
     pdf.cell(0, 7, " [ VALIDATED CLINICAL SEVERITY SCORES ]", ln=1, fill=True)
     pdf.set_font("Arial", '', 8.5)
     iga_text = sanitize_text(IGA_SCALE.get(iga_score, 'N/A'))
-    pdf.cell(95, 7, f" IGA ACNE SCORE: {iga_score}/4 - {iga_text[:50]}", border=1)
+    pdf.cell(95, 7, f" IGA ACNE SCORE: {iga_score}/4", border=1)
     pdf.cell(95, 7, f" GLOGAU PHOTOAGING: Type {glogau_score}/4", border=1, ln=1)
+    pdf.cell(0, 7, f" ACNE STAGE: {iga_text[:110]}", border=1, ln=1)
     glogau_text = sanitize_text(GLOGAU_SCALE.get(glogau_score, ""))
-    pdf.cell(0, 7, f" {glogau_text[:100]}", border=1, ln=1)
+    pdf.cell(0, 7, f" PHOTOAGING CLASS: {glogau_text[:110]}", border=1, ln=1)
     pdf.ln(3)
 
     # PIGMENTATION
@@ -1279,9 +1280,9 @@ def generate_clinical_pdf(name, age, prediction, clinical_data, age_focus,
     pdf.set_font("Arial", 'B', 9)
     pdf.cell(0, 7, " [ PIGMENTATION ANALYTICS ]", ln=1, fill=True)
     pdf.set_font("Arial", '', 8.5)
-    pdf.cell(63, 7, f" DENSITY: {clinical_data['pigment_density']}%", border=1)
-    pdf.cell(63, 7, f" COLOR CLASS: {clinical_data['pigment_color']}", border=1)
-    pdf.cell(64, 7, f" RGB: {clinical_data['pigment_rgb']}", border=1, ln=1)
+    pdf.cell(60, 7, f" DENSITY: {clinical_data['pigment_density']}%", border=1)
+    pdf.cell(50, 7, f" RGB: {clinical_data['pigment_rgb']}", border=1)
+    pdf.cell(80, 7, f" COLOR CLASS: {clinical_data['pigment_color']}", border=1, ln=1)
     pdf.cell(0, 7, f" TYPE: {clinical_data['pigment_type']}", border=1, ln=1)
     
     # Footer for Page 1
