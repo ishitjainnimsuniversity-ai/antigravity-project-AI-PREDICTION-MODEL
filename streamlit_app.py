@@ -7,6 +7,7 @@ from PIL import Image
 import datetime
 import io
 import math
+import urllib.request
 
 try:
     import cv2
@@ -17,6 +18,10 @@ try:
     import mediapipe as mp
 except ImportError:
     mp = None
+
+# Model details for Face Mesh tasks API fallback
+MODEL_PATH = "face_landmarker.task"
+MODEL_URL = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task"
 
 try:
     from sklearn.ensemble import RandomForestClassifier
@@ -319,11 +324,37 @@ def correct_white_balance(img, custom_ref_rgb=None):
         return img
 
 
+def download_face_landmarker_model():
+    if not os.path.exists(MODEL_PATH):
+        try:
+            urllib.request.urlretrieve(MODEL_URL, MODEL_PATH)
+        except Exception:
+            pass
+
+@st.cache_resource
+def get_face_landmarker_detector():
+    download_face_landmarker_model()
+    if not os.path.exists(MODEL_PATH):
+        return None
+    try:
+        from mediapipe.tasks import python
+        from mediapipe.tasks.python import vision
+        base_options = python.BaseOptions(model_asset_path=MODEL_PATH)
+        options = vision.FaceLandmarkerOptions(
+            base_options=base_options,
+            output_face_blendshapes=False,
+            output_facial_transformation_matrixes=False,
+            num_faces=1)
+        return vision.FaceLandmarker.create_from_options(options)
+    except Exception:
+        return None
+
 def get_mediapipe_skin_mask(img):
     """
     Isolates only the skin pixels of the face using MediaPipe Face Mesh convex hull.
     Strips out eyes, mouth, hair, and background.
     Falls back to HSV/RGB threshold mask if no face is detected or if MediaPipe fails.
+    Uses the modern Tasks API first, and falls back to legacy solutions if Tasks fails.
     """
     img_rgb = np.array(img.convert('RGB'))
     h, w, c = img_rgb.shape
@@ -337,53 +368,89 @@ def get_mediapipe_skin_mask(img):
     if mp is None or cv2 is None:
         return fallback_mask, False
 
+    oval_indices = [
+        10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378,
+        400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21,
+        54, 103, 67, 109
+    ]
+    left_eye_indices = [362, 382, 381, 380, 374, 373, 390, 249, 263, 466, 388, 387, 386, 385, 384, 398]
+    right_eye_indices = [33, 7, 163, 144, 145, 153, 154, 155, 133, 173, 157, 158, 159, 160, 161, 246]
+    lips_indices = [78, 95, 88, 178, 87, 14, 317, 402, 318, 324, 308, 415, 310, 311, 312, 13, 82, 81, 80, 191]
+
+    # --- METHOD 1: Try modern Tasks API (highly compatible with Python 3.12) ---
+    detector = get_face_landmarker_detector()
+    if detector is not None:
+        try:
+            mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=img_rgb)
+            res = detector.detect(mp_image)
+            if res.face_landmarks:
+                landmarks = res.face_landmarks[0]
+                
+                def to_pixels_tasks(indices):
+                    pts = []
+                    for idx in indices:
+                        pt = landmarks[idx]
+                        pts.append([int(pt.x * w), int(pt.y * h)])
+                    return np.array(pts, dtype=np.int32)
+
+                oval_pts = to_pixels_tasks(oval_indices)
+                left_eye_pts = to_pixels_tasks(left_eye_indices)
+                right_eye_pts = to_pixels_tasks(right_eye_indices)
+                lips_pts = to_pixels_tasks(lips_indices)
+
+                face_mask = np.zeros((h, w), dtype=np.uint8)
+                cv2.fillPoly(face_mask, [oval_pts], 255)
+                cv2.fillPoly(face_mask, [left_eye_pts], 0)
+                cv2.fillPoly(face_mask, [right_eye_pts], 0)
+                cv2.fillPoly(face_mask, [lips_pts], 0)
+
+                mediapipe_mask = face_mask > 0
+                final_mask = mediapipe_mask & fallback_mask
+                if np.sum(final_mask) < 200:
+                    final_mask = mediapipe_mask if np.sum(mediapipe_mask) > 200 else fallback_mask
+                return final_mask, True
+        except Exception:
+            pass
+
+    # --- METHOD 2: Try legacy Solutions API fallback (works on older Python/Linux) ---
     try:
-        mp_face_mesh = mp.solutions.face_mesh
-        with mp_face_mesh.FaceMesh(
-            static_image_mode=True,
-            max_num_faces=1,
-            refine_landmarks=True,
-            min_detection_confidence=0.3
-        ) as face_mesh:
-            results = face_mesh.process(img_rgb)
-            if not results.multi_face_landmarks:
-                return fallback_mask, False
+        if hasattr(mp, 'solutions') and hasattr(mp.solutions, 'face_mesh'):
+            mp_face_mesh = mp.solutions.face_mesh
+            with mp_face_mesh.FaceMesh(
+                static_image_mode=True,
+                max_num_faces=1,
+                refine_landmarks=True,
+                min_detection_confidence=0.3
+            ) as face_mesh:
+                results = face_mesh.process(img_rgb)
+                if results.multi_face_landmarks:
+                    landmarks = results.multi_face_landmarks[0].landmark
 
-            landmarks = results.multi_face_landmarks[0].landmark
-            oval_indices = [
-                10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378,
-                400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21,
-                54, 103, 67, 109
-            ]
-            left_eye_indices = [362, 382, 381, 380, 374, 373, 390, 249, 263, 466, 388, 387, 386, 385, 384, 398]
-            right_eye_indices = [33, 7, 163, 144, 145, 153, 154, 155, 133, 173, 157, 158, 159, 160, 161, 246]
-            lips_indices = [78, 95, 88, 178, 87, 14, 317, 402, 318, 324, 308, 415, 310, 311, 312, 13, 82, 81, 80, 191]
+                    def to_pixels_sol(indices):
+                        pts = []
+                        for idx in indices:
+                            pt = landmarks[idx]
+                            pts.append([int(pt.x * w), int(pt.y * h)])
+                        return np.array(pts, dtype=np.int32)
 
-            def to_pixels(indices):
-                pts = []
-                for idx in indices:
-                    pt = landmarks[idx]
-                    pts.append([int(pt.x * w), int(pt.y * h)])
-                return np.array(pts, dtype=np.int32)
+                    oval_pts = to_pixels_sol(oval_indices)
+                    left_eye_pts = to_pixels_sol(left_eye_indices)
+                    right_eye_pts = to_pixels_sol(right_eye_indices)
+                    lips_pts = to_pixels_sol(lips_indices)
 
-            oval_pts = to_pixels(oval_indices)
-            left_eye_pts = to_pixels(left_eye_indices)
-            right_eye_pts = to_pixels(right_eye_indices)
-            lips_pts = to_pixels(lips_indices)
+                    face_mask = np.zeros((h, w), dtype=np.uint8)
+                    cv2.fillPoly(face_mask, [oval_pts], 255)
+                    cv2.fillPoly(face_mask, [left_eye_pts], 0)
+                    cv2.fillPoly(face_mask, [right_eye_pts], 0)
+                    cv2.fillPoly(face_mask, [lips_pts], 0)
 
-            face_mask = np.zeros((h, w), dtype=np.uint8)
-            cv2.fillPoly(face_mask, [oval_pts], 255)
-            cv2.fillPoly(face_mask, [left_eye_pts], 0)
-            cv2.fillPoly(face_mask, [right_eye_pts], 0)
-            cv2.fillPoly(face_mask, [lips_pts], 0)
-
-            mediapipe_mask = face_mask > 0
-            final_mask = mediapipe_mask & fallback_mask
-            if np.sum(final_mask) < 200:
-                final_mask = mediapipe_mask if np.sum(mediapipe_mask) > 200 else fallback_mask
-            return final_mask, True
+                    mediapipe_mask = face_mask > 0
+                    final_mask = mediapipe_mask & fallback_mask
+                    if np.sum(final_mask) < 200:
+                        final_mask = mediapipe_mask if np.sum(mediapipe_mask) > 200 else fallback_mask
+                    return final_mask, True
     except Exception:
-        return fallback_mask, False
+        pass
 
 
 def rgb_to_lab(R, G, B):
