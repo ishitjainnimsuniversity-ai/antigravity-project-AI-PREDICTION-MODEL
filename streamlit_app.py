@@ -1111,114 +1111,59 @@ def generate_clinical_pdf(name, age, prediction, clinical_data, age_focus,
     eye_rx = sanitized_eye_rx
 
     pdf = FPDF()
+    
+    # ==========================================
+    # PAGE 1: BIOMETRICS & DIAGNOSTICS
+    # ==========================================
     pdf.add_page()
 
     # HEADER
     pdf.set_fill_color(8, 15, 50)
-    pdf.rect(0, 0, 210, 42, 'F')
+    pdf.rect(0, 0, 210, 36, 'F')
     pdf.set_text_color(0, 210, 255)
-    pdf.set_font("Arial", 'B', 20)
-    pdf.cell(0, 18, " VISION-AI | CLINICAL DERMATOLOGY REPORT", ln=1, align='C')
-    pdf.set_font("Arial", 'I', 9)
+    pdf.set_font("Arial", 'B', 18)
+    pdf.cell(0, 14, " VISION-AI | CLINICAL DERMATOLOGY REPORT", ln=1, align='C')
+    pdf.set_font("Arial", 'I', 8)
     pdf.set_text_color(200, 220, 255)
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    pdf.cell(0, 6, f"ENCRYPTED CLINICAL ANALYSIS | SESSION: {timestamp} | AES-256 SECURED", ln=1, align='C')
-    pdf.cell(0, 5, "FOR CLINICAL REFERENCE ONLY - CONSULT A BOARD-CERTIFIED DERMATOLOGIST FOR MEDICAL DECISIONS", ln=1, align='C')
-    pdf.ln(10)
+    pdf.cell(0, 5, f"ENCRYPTED CLINICAL ANALYSIS | SESSION: {timestamp} | AES-256 SECURED", ln=1, align='C')
+    pdf.cell(0, 5, "FOR CLINICAL REFERENCE ONLY - CONSULT A DERMATOLOGIST FOR MEDICAL DECISIONS", ln=1, align='C')
+    pdf.ln(8)
 
     # PATIENT PROFILE
     pdf.set_text_color(0, 0, 0)
     pdf.set_fill_color(220, 235, 255)
-    pdf.set_font("Arial", 'B', 10)
-    pdf.cell(0, 8, " [ PATIENT BIO-PROFILE ]", ln=1, fill=True)
-    pdf.set_font("Arial", '', 9)
+    pdf.set_font("Arial", 'B', 9)
+    pdf.cell(0, 7, " [ PATIENT BIO-PROFILE ]", ln=1, fill=True)
+    pdf.set_font("Arial", '', 8.5)
     fitz_info = FITZPATRICK_SCALE.get(clinical_data['fitzpatrick_type'], FITZPATRICK_SCALE[3])
     fitz_name = sanitize_text(fitz_info['name'])
     fitz_desc = sanitize_text(fitz_info['desc'])
     fitz_spf = sanitize_text(fitz_info['spf'])
     
-    pdf.cell(95, 8, f" NAME: {name.upper()}", border=1)
-    pdf.cell(95, 8, f" AGE: {age} YEARS | AGE GROUP: {get_age_group(age)}", border=1, ln=1)
-    pdf.cell(95, 8, f" FITZPATRICK TYPE: {fitz_name}", border=1)
-    pdf.cell(95, 8, f" UV SENSITIVITY: {fitz_spf}", border=1, ln=1)
-    pdf.cell(0, 8, f" FITZPATRICK DESC: {fitz_desc}", border=1, ln=1)
-    pdf.ln(4)
+    pdf.cell(95, 7, f" NAME: {name.upper()}", border=1)
+    pdf.cell(95, 7, f" AGE: {age} YEARS | AGE GROUP: {get_age_group(age)}", border=1, ln=1)
+    pdf.cell(95, 7, f" FITZPATRICK TYPE: {fitz_name}", border=1)
+    pdf.cell(95, 7, f" UV SENSITIVITY: {fitz_spf}", border=1, ln=1)
+    pdf.cell(0, 7, f" FITZPATRICK DESC: {fitz_desc}", border=1, ln=1)
+    pdf.ln(3)
 
     # INTEGRATED HEALTH SCORECARD
     pdf.set_fill_color(220, 255, 230)
-    pdf.set_font("Arial", 'B', 10)
-    pdf.cell(0, 8, " [ INTEGRATED CLINICAL HEALTH SCORECARD ]", ln=1, fill=True)
-    pdf.set_font("Arial", '', 9)
-    pdf.cell(95, 8, f" SKIN HEALTH INDEX: {skin_health_score}%", border=1)
-    pdf.cell(95, 8, f" RETINA HEALTH INDEX: {retina_score}% ({eye_status})", border=1, ln=1)
-    pdf.ln(4)
+    pdf.set_font("Arial", 'B', 9)
+    pdf.cell(0, 7, " [ INTEGRATED CLINICAL HEALTH SCORECARD ]", ln=1, fill=True)
+    pdf.set_font("Arial", '', 8.5)
+    pdf.cell(95, 7, f" SKIN HEALTH INDEX: {skin_health_score}%", border=1)
+    pdf.cell(95, 7, f" RETINA HEALTH INDEX: {retina_score}% ({eye_status})", border=1, ln=1)
+    pdf.ln(3)
 
-    # COLORIMETRY HUD (CIELab)
-    pdf.set_fill_color(255, 245, 210)
-    pdf.set_font("Arial", 'B', 10)
-    pdf.cell(0, 8, " [ CIELab COLORIMETRY ANALYSIS (Mexameter-Grade) ]", ln=1, fill=True)
-    pdf.set_font("Arial", '', 9)
-    pdf.cell(42, 8, f" L* (Lightness): {clinical_data['L_star']}", border=1)
-    pdf.cell(42, 8, f" a* (Redness): {clinical_data['a_star']}", border=1)
-    pdf.cell(42, 8, f" b* (Yellowness): {clinical_data['b_star']}", border=1)
-    pdf.cell(64, 8, f" ITA Angle: {clinical_data['ita_deg']} deg ", border=1, ln=1)
-    pdf.cell(95, 8, f" ERYTHEMA INDEX (EI): {clinical_data['erythema_index']}% (Normal: 0-15%)", border=1)
-    pdf.cell(95, 8, f" MELANIN INDEX (MI): {clinical_data['melanin_index']}% (Normal: 20-50%)", border=1, ln=1)
-    pdf.ln(4)
-
-    # CLINICAL SEVERITY SCORES
-    pdf.set_fill_color(255, 235, 235)
-    pdf.set_font("Arial", 'B', 10)
-    pdf.cell(0, 8, " [ VALIDATED CLINICAL SEVERITY SCORES ]", ln=1, fill=True)
-    pdf.set_font("Arial", '', 9)
-    iga_text = sanitize_text(IGA_SCALE.get(iga_score, 'N/A'))
-    pdf.cell(95, 8, f" IGA ACNE SCORE: {iga_score}/4 - {iga_text[:50]}", border=1)
-    pdf.cell(95, 8, f" GLOGAU PHOTOAGING: Type {glogau_score}/4", border=1, ln=1)
-    glogau_text = sanitize_text(GLOGAU_SCALE.get(glogau_score, ""))
-    pdf.cell(0, 8, f" {glogau_text[:100]}", border=1, ln=1)
-    pdf.ln(4)
-
-    # PIGMENTATION
-    pdf.set_fill_color(240, 240, 255)
-    pdf.set_font("Arial", 'B', 10)
-    pdf.cell(0, 8, " [ PIGMENTATION ANALYTICS ]", ln=1, fill=True)
-    pdf.set_font("Arial", '', 9)
-    pdf.cell(63, 8, f" DENSITY: {clinical_data['pigment_density']}%", border=1)
-    pdf.cell(63, 8, f" COLOR CLASS: {clinical_data['pigment_color']}", border=1)
-    pdf.cell(64, 8, f" RGB: {clinical_data['pigment_rgb']}", border=1, ln=1)
-    pdf.cell(0, 8, f" TYPE: {clinical_data['pigment_type']}", border=1, ln=1)
-    pdf.ln(4)
-
-    # DEEP BIO-PHYSIOLOGICAL MARKERS
-    pdf.set_fill_color(230, 255, 245)
-    pdf.set_font("Arial", 'B', 10)
-    pdf.cell(0, 8, " [ DEEP BIO-PHYSIOLOGICAL DERMAL SCAN MARKERS ]", ln=1, fill=True)
-    pdf.set_font("Arial", '', 9)
-    m1 = f" SEBUM/OILINESS: {clinical_data['sebum_index']}%  |  HYDRATION: {clinical_data['hydration_index']}%  |  TEWL PROXY: {clinical_data['tewl_proxy']} g/m2h"
-    m2 = f" PORE SIZE INDEX: {clinical_data['pore_index']}%  |  WRINKLE DEPTH: {clinical_data['wrinkle_index']}%  |  INFLAMMATION: {clinical_data['inflammation_index']}%"
-    m3 = f" BARRIER INTEGRITY: {clinical_data['barrier_score']}%  |  UV DAMAGE SCORE: {clinical_data['uv_damage_score']}%  |  LESION COUNT: {clinical_data['lesion_count']}"
-    m4 = f" GLCM CONTRAST: {clinical_data['glcm_contrast']}  |  GLCM HOMOGENEITY: {clinical_data['glcm_homogeneity']}  |  LBP TEXTURE VAR: {clinical_data['lbp_var']}"
-    for m in [m1, m2, m3, m4]:
-        pdf.cell(0, 8, m, border=1, ln=1)
-    pdf.ln(4)
-
-    # PROBABILITY BREAKDOWN
-    pdf.set_fill_color(245, 240, 255)
-    pdf.set_font("Arial", 'B', 10)
-    pdf.cell(0, 8, " [ NEURAL BIO-DERMAL PROBABILITY BREAKDOWN ]", ln=1, fill=True)
-    pdf.set_font("Arial", '', 9)
-    probs_pct = [round(float(p)*100, 1) for p in probs]
-    prob_str1 = f" HEALTHY SKIN: {probs_pct[4]}%  |  ACNE: {probs_pct[0]}%  |  ECZEMA: {probs_pct[1]}%"
-    prob_str2 = f" PSORIASIS: {probs_pct[2]}%  |  WRINKLES: {probs_pct[3]}%"
-    pdf.cell(0, 8, prob_str1, border=1, ln=1)
-    pdf.cell(0, 8, prob_str2, border=1, ln=1)
-    pdf.ln(4)
-
-    # VISUALS (face + plot)
-    pdf.set_font("Arial", 'B', 10)
-    pdf.cell(0, 8, " [ SCAN IMAGE & 10-YEAR BIO-STABILITY PROJECTION ]", ln=1, fill=True)
+    # VISUALS (face + plot) - PLACED PROMINENTLY ON PAGE 1
+    pdf.set_fill_color(230, 230, 250)
+    pdf.set_font("Arial", 'B', 9)
+    pdf.cell(0, 7, " [ SCAN IMAGE & 10-YEAR BIO-STABILITY PROJECTION ]", ln=1, fill=True)
     pdf.ln(2)
     y_vis = pdf.get_y()
+    
     import uuid
     unique_id = uuid.uuid4().hex
     temp_img_path = f"temp_web_image_{unique_id}.jpg"
@@ -1227,8 +1172,9 @@ def generate_clinical_pdf(name, age, prediction, clinical_data, age_focus,
         img.save(temp_img_path)
         with open(temp_plot_path, "wb") as f:
             f.write(plot_buf.getvalue())
-        pdf.image(temp_img_path, x=12, y=y_vis, w=88)
-        pdf.image(temp_plot_path, x=108, y=y_vis, w=88)
+        # Draw images with bounded width and height to prevent page overflow
+        pdf.image(temp_img_path, x=12, y=y_vis, w=88, h=55)
+        pdf.image(temp_plot_path, x=108, y=y_vis, w=88, h=55)
     finally:
         try:
             if os.path.exists(temp_img_path):
@@ -1240,26 +1186,111 @@ def generate_clinical_pdf(name, age, prediction, clinical_data, age_focus,
                 os.remove(temp_plot_path)
         except Exception:
             pass
-    pdf.set_y(y_vis + 68)
-    pdf.ln(8)
+    
+    # Move cursor past the images
+    pdf.set_y(y_vis + 57)
+    pdf.ln(3)
+
+    # COLORIMETRY HUD (CIELab)
+    pdf.set_fill_color(255, 245, 210)
+    pdf.set_font("Arial", 'B', 9)
+    pdf.cell(0, 7, " [ CIELab COLORIMETRY ANALYSIS (Mexameter-Grade) ]", ln=1, fill=True)
+    pdf.set_font("Arial", '', 8.5)
+    pdf.cell(42, 7, f" L* (Lightness): {clinical_data['L_star']}", border=1)
+    pdf.cell(42, 7, f" a* (Redness): {clinical_data['a_star']}", border=1)
+    pdf.cell(42, 7, f" b* (Yellowness): {clinical_data['b_star']}", border=1)
+    pdf.cell(64, 7, f" ITA Angle: {clinical_data['ita_deg']} deg ", border=1, ln=1)
+    pdf.cell(95, 7, f" ERYTHEMA INDEX (EI): {clinical_data['erythema_index']}% (Normal: 0-15%)", border=1)
+    pdf.cell(95, 7, f" MELANIN INDEX (MI): {clinical_data['melanin_index']}% (Normal: 20-50%)", border=1, ln=1)
+    pdf.ln(3)
+
+    # CLINICAL SEVERITY SCORES
+    pdf.set_fill_color(255, 235, 235)
+    pdf.set_font("Arial", 'B', 9)
+    pdf.cell(0, 7, " [ VALIDATED CLINICAL SEVERITY SCORES ]", ln=1, fill=True)
+    pdf.set_font("Arial", '', 8.5)
+    iga_text = sanitize_text(IGA_SCALE.get(iga_score, 'N/A'))
+    pdf.cell(95, 7, f" IGA ACNE SCORE: {iga_score}/4 - {iga_text[:50]}", border=1)
+    pdf.cell(95, 7, f" GLOGAU PHOTOAGING: Type {glogau_score}/4", border=1, ln=1)
+    glogau_text = sanitize_text(GLOGAU_SCALE.get(glogau_score, ""))
+    pdf.cell(0, 7, f" {glogau_text[:100]}", border=1, ln=1)
+    pdf.ln(3)
+
+    # PIGMENTATION
+    pdf.set_fill_color(240, 240, 255)
+    pdf.set_font("Arial", 'B', 9)
+    pdf.cell(0, 7, " [ PIGMENTATION ANALYTICS ]", ln=1, fill=True)
+    pdf.set_font("Arial", '', 8.5)
+    pdf.cell(63, 7, f" DENSITY: {clinical_data['pigment_density']}%", border=1)
+    pdf.cell(63, 7, f" COLOR CLASS: {clinical_data['pigment_color']}", border=1)
+    pdf.cell(64, 7, f" RGB: {clinical_data['pigment_rgb']}", border=1, ln=1)
+    pdf.cell(0, 7, f" TYPE: {clinical_data['pigment_type']}", border=1, ln=1)
+    
+    # Footer for Page 1
+    pdf.set_y(-15)
+    pdf.set_font("Arial", 'I', 7)
+    pdf.set_text_color(130, 130, 130)
+    pdf.cell(0, 4, "VISION-AI CLINICAL REPORT | PAGE 1 OF 2 | SECURE DOCUMENT", ln=1, align='C')
+
+    # ==========================================
+    # PAGE 2: DEEP BIOMARKERS & RECOVERY PLAN
+    # ==========================================
+    pdf.add_page()
+
+    # PAGE 2 HEADER
+    pdf.set_fill_color(8, 15, 50)
+    pdf.rect(0, 0, 210, 25, 'F')
+    pdf.set_text_color(0, 210, 255)
+    pdf.set_font("Arial", 'B', 13)
+    pdf.cell(0, 9, " VISION-AI | CLINICAL DIAGNOSTIC INSIGHTS", ln=1, align='C')
+    pdf.set_font("Arial", 'I', 7.5)
+    pdf.set_text_color(200, 220, 255)
+    pdf.cell(0, 4, f"PATIENT: {name.upper()} | CLINICAL RECOVERY PROTOCOLS & DEEP BIOMARKERS", ln=1, align='C')
+    pdf.ln(6)
+
+    # DEEP BIO-PHYSIOLOGICAL MARKERS
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_fill_color(230, 255, 245)
+    pdf.set_font("Arial", 'B', 9)
+    pdf.cell(0, 7, " [ DEEP BIO-PHYSIOLOGICAL DERMAL SCAN MARKERS ]", ln=1, fill=True)
+    pdf.set_font("Arial", '', 8.5)
+    m1 = f" SEBUM/OILINESS: {clinical_data['sebum_index']}%  |  HYDRATION: {clinical_data['hydration_index']}%  |  TEWL PROXY: {clinical_data['tewl_proxy']} g/m2h"
+    m2 = f" PORE SIZE INDEX: {clinical_data['pore_index']}%  |  WRINKLE DEPTH: {clinical_data['wrinkle_index']}%  |  INFLAMMATION: {clinical_data['inflammation_index']}%"
+    m3 = f" BARRIER INTEGRITY: {clinical_data['barrier_score']}%  |  UV DAMAGE SCORE: {clinical_data['uv_damage_score']}%  |  LESION COUNT: {clinical_data['lesion_count']}"
+    m4 = f" GLCM CONTRAST: {clinical_data['glcm_contrast']}  |  GLCM HOMOGENEITY: {clinical_data['glcm_homogeneity']}  |  LBP TEXTURE VAR: {clinical_data['lbp_var']}"
+    for m in [m1, m2, m3, m4]:
+        pdf.cell(0, 7, m, border=1, ln=1)
+    pdf.ln(3)
+
+    # PROBABILITY BREAKDOWN
+    pdf.set_fill_color(245, 240, 255)
+    pdf.set_font("Arial", 'B', 9)
+    pdf.cell(0, 7, " [ NEURAL BIO-DERMAL PROBABILITY BREAKDOWN ]", ln=1, fill=True)
+    pdf.set_font("Arial", '', 8.5)
+    probs_pct = [round(float(p)*100, 1) for p in probs]
+    prob_str1 = f" HEALTHY SKIN: {probs_pct[4]}%  |  ACNE: {probs_pct[0]}%  |  ECZEMA: {probs_pct[1]}%"
+    prob_str2 = f" PSORIASIS: {probs_pct[2]}%  |  WRINKLES: {probs_pct[3]}%"
+    pdf.cell(0, 7, prob_str1, border=1, ln=1)
+    pdf.cell(0, 7, prob_str2, border=1, ln=1)
+    pdf.ln(3)
 
     # DIAGNOSTIC CORE
     pdf.set_fill_color(15, 25, 80)
     pdf.set_text_color(255, 255, 255)
-    pdf.set_font("Arial", 'B', 12)
-    pdf.cell(0, 12, f" PRIMARY DIAGNOSIS: {prediction.upper()}", ln=1, fill=True)
+    pdf.set_font("Arial", 'B', 11)
+    pdf.cell(0, 10, f" PRIMARY DIAGNOSIS: {prediction.upper()}", ln=1, fill=True)
     pdf.set_text_color(0, 0, 0)
-    pdf.set_font("Courier", '', 9)
-    pdf.ln(2)
-    pdf.multi_cell(0, 5, f"Clinical neural engine analysis complete. Bio-signature matched with high confidence. IGA Score: {iga_score}/4. GLOGAU: Type {glogau_score}. Skin Health: {skin_health_score}%.")
-    pdf.ln(6)
+    pdf.set_font("Courier", '', 8.5)
+    pdf.ln(1)
+    pdf.multi_cell(0, 4.5, f"Clinical neural engine analysis complete. Bio-signature matched with high confidence. IGA Score: {iga_score}/4. GLOGAU: Type {glogau_score}. Skin Health: {skin_health_score}%.")
+    pdf.ln(3)
 
     # CLINICAL RECOVERY PROTOCOL
     pdf.set_fill_color(238, 238, 238)
-    pdf.set_font("Arial", 'B', 11)
+    pdf.set_font("Arial", 'B', 10)
     pdf.set_text_color(0, 0, 0)
-    pdf.cell(0, 9, " [ EVIDENCE-BASED CLINICAL RECOVERY & MAINTENANCE PROTOCOL ]", ln=1, fill=True)
-    pdf.ln(2)
+    pdf.cell(0, 8, " [ EVIDENCE-BASED CLINICAL RECOVERY & MAINTENANCE PROTOCOL ]", ln=1, fill=True)
+    pdf.ln(1)
 
     sections = [
         ("AGE-SPECIFIC CLINICAL FOCUS:", age_focus, (180, 0, 0)),
@@ -1274,20 +1305,20 @@ def generate_clinical_pdf(name, age, prediction, clinical_data, age_focus,
     ]
 
     for heading, content, color in sections:
-        pdf.set_font("Arial", 'B', 9)
+        pdf.set_font("Arial", 'B', 8.5)
         pdf.set_text_color(*color)
-        pdf.cell(0, 7, heading, ln=1)
+        pdf.cell(0, 6, heading, ln=1)
         pdf.set_font("Arial", '', 8)
         pdf.set_text_color(30, 30, 30)
-        pdf.multi_cell(0, 5, content)
-        pdf.ln(3)
+        pdf.multi_cell(0, 4.5, content)
+        pdf.ln(1.5)
 
     # FOOTER
-    pdf.set_y(-20)
+    pdf.set_y(-15)
     pdf.set_font("Arial", 'I', 7)
     pdf.set_text_color(130, 130, 130)
-    pdf.cell(0, 4, "VISION-AI CLINICAL SUITE | QUANTUM DERMATOLOGY EDITION 2026 | SECURE DOCUMENT", ln=1, align='C')
-    pdf.cell(0, 4, "THIS REPORT IS GENERATED BY A NEURAL CLINICAL ENGINE. ALWAYS CONSULT A BOARD-CERTIFIED DERMATOLOGIST FOR MEDICAL DECISIONS.", ln=1, align='C')
+    pdf.cell(0, 4, "VISION-AI CLINICAL SUITE | QUANTUM DERMATOLOGY EDITION 2026 | PAGE 2 OF 2 | SECURE DOCUMENT", ln=1, align='C')
+    pdf.cell(0, 4, "THIS REPORT IS GENERATED BY A NEURAL CLINICAL ENGINE. ALWAYS CONSULT A DERMATOLOGIST FOR MEDICAL DECISIONS.", ln=1, align='C')
 
     try:
         return pdf.output()
