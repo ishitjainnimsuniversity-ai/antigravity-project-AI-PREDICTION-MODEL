@@ -1381,40 +1381,94 @@ def generate_clinical_pdf(name, age, prediction, clinical_data, age_focus,
 
     pdf = FPDF()
     
-    # ==========================================
-    # PAGE 1: BIOMETRICS & DIAGNOSTICS
-    # ==========================================
-    pdf.add_page()
-
-    # Configure theme colors [R, G, B] for headers
+    # Configure theme colors [R, G, B]
     if theme == "Dark Cyberpunk":
+        bg_page = (15, 10, 25)
+        border_color = (255, 0, 128)   # Neon Pink
         bg_profile = (30, 20, 45)      # Deep purple
         bg_scorecard = (20, 45, 40)    # Deep teal
         bg_visuals = (45, 15, 30)      # Deep pink
         bg_colorimetry = (45, 45, 20)  # Deep yellow/gold
         bg_severity = (45, 20, 20)     # Deep red
         bg_pigment = (25, 20, 45)      # Deep violet
-        text_color = (255, 255, 255)
+        bg_probability = (25, 20, 45)  # Deep violet
+        bg_diagnostic = (30, 20, 45)
+        text_diagnostic = (0, 255, 240) # Cyan
+        bg_protocol_hdr = (45, 15, 30)
+        text_protocol_hdr = (255, 0, 128) # Neon Pink
+        text_color = (240, 240, 240)   # Off-white
         heading_color = (255, 0, 128)  # Neon Pink
+        footer_text_color = (150, 150, 150)
+        section_heading_colors = [
+            (0, 255, 240),   # Neon Cyan
+            (255, 0, 128),   # Neon Pink
+            (240, 240, 0),   # Neon Yellow
+            (50, 255, 50),   # Neon Green
+            (255, 128, 0),   # Neon Orange
+            (100, 200, 255), # Neon Light Blue
+            (200, 100, 255)  # Neon Lavender
+        ]
     elif theme == "Apothecary Earth":
+        bg_page = (245, 242, 235)      # Cream/parchment
+        border_color = (120, 110, 90)  # Muted bronze/brown
         bg_profile = (225, 220, 205)   # Light cream/beige
         bg_scorecard = (215, 225, 205) # Light sage
         bg_visuals = (225, 215, 205)   # Light clay/sand
         bg_colorimetry = (230, 225, 210)# Soft canvas
         bg_severity = (230, 215, 215)  # Soft terracotta
         bg_pigment = (220, 220, 225)   # Soft stone
-        text_color = (40, 35, 30)       # Dark charcoal/brown
+        bg_probability = (220, 220, 225)
+        bg_diagnostic = (60, 70, 50)    # Olive
+        text_diagnostic = (245, 242, 235) # Cream
+        bg_protocol_hdr = (120, 110, 90) # Muted brown/bronze
+        text_protocol_hdr = (245, 242, 235) # Cream
+        text_color = (50, 45, 40)       # Dark charcoal
         heading_color = (60, 70, 50)    # Olive
+        footer_text_color = (120, 110, 100)
+        section_heading_colors = [
+            (140, 60, 40),   # Rust
+            (70, 90, 70),    # Sage
+            (90, 70, 50),    # Brown
+            (50, 80, 50),    # Forest Green
+            (150, 110, 50),  # Ochre
+            (160, 90, 70),   # Terracotta
+            (90, 90, 85)     # Warm Grey
+        ]
     else:
-        # Default Clinical
+        # Default Clinical Lab Blue
+        bg_page = (255, 255, 255)
+        border_color = (100, 150, 220) # Soft blue
         bg_profile = (220, 235, 255)
         bg_scorecard = (220, 255, 230)
         bg_visuals = (230, 230, 250)
         bg_colorimetry = (255, 245, 210)
         bg_severity = (255, 235, 235)
         bg_pigment = (240, 240, 255)
-        text_color = (0, 0, 0)
+        bg_probability = (245, 240, 255)
+        bg_diagnostic = (15, 25, 80)
+        text_diagnostic = (255, 255, 255)
+        bg_protocol_hdr = (238, 238, 238)
+        text_protocol_hdr = (8, 15, 50)
+        text_color = (20, 20, 20)
         heading_color = (8, 15, 50)
+        footer_text_color = (130, 130, 130)
+        section_heading_colors = [
+            (180, 0, 0),     # Red
+            (0, 100, 180),   # Blue
+            (130, 0, 130),   # Purple
+            (0, 130, 60),    # Green
+            (180, 100, 0),   # Brown
+            (0, 140, 80),    # Teal
+            (0, 0, 180)      # Dark Blue
+        ]
+
+    # ==========================================
+    # PAGE 1: BIOMETRICS & DIAGNOSTICS
+    # ==========================================
+    pdf.add_page()
+    pdf.set_fill_color(*bg_page)
+    pdf.rect(0, 0, 210, 297, 'F')
+    pdf.set_draw_color(*border_color)
 
     # HEADER
     if theme == "Dark Cyberpunk":
@@ -1552,13 +1606,16 @@ def generate_clinical_pdf(name, age, prediction, clinical_data, age_focus,
     # Footer for Page 1
     pdf.set_y(-15)
     pdf.set_font("Arial", 'I', 7)
-    pdf.set_text_color(130, 130, 130)
+    pdf.set_text_color(*footer_text_color)
     pdf.cell(0, 4, "VISION-AI CLINICAL REPORT | PAGE 1 OF 2 | SECURE DOCUMENT", ln=1, align='C')
 
     # ==========================================
     # PAGE 2: DEEP BIOMARKERS & RECOVERY PLAN
     # ==========================================
     pdf.add_page()
+    pdf.set_fill_color(*bg_page)
+    pdf.rect(0, 0, 210, 297, 'F')
+    pdf.set_draw_color(*border_color)
 
     # PAGE 2 HEADER
     if theme == "Dark Cyberpunk":
@@ -1604,7 +1661,7 @@ def generate_clinical_pdf(name, age, prediction, clinical_data, age_focus,
     pdf.ln(3)
 
     # PROBABILITY BREAKDOWN
-    pdf.set_fill_color(245, 240, 255)
+    pdf.set_fill_color(*bg_probability)
     pdf.set_font("Arial", 'B', 9)
     pdf.cell(0, 7, " [ NEURAL BIO-DERMAL PROBABILITY BREAKDOWN ]", ln=1, fill=True)
     pdf.set_font("Arial", '', 8.5)
@@ -1616,48 +1673,48 @@ def generate_clinical_pdf(name, age, prediction, clinical_data, age_focus,
     pdf.ln(3)
 
     # DIAGNOSTIC CORE
-    pdf.set_fill_color(15, 25, 80)
-    pdf.set_text_color(255, 255, 255)
+    pdf.set_fill_color(*bg_diagnostic)
+    pdf.set_text_color(*text_diagnostic)
     pdf.set_font("Arial", 'B', 11)
     pdf.cell(0, 10, f" PRIMARY DIAGNOSIS: {prediction.upper()}", ln=1, fill=True)
-    pdf.set_text_color(0, 0, 0)
+    pdf.set_text_color(*text_color)
     pdf.set_font("Courier", '', 8.5)
     pdf.ln(1)
     pdf.multi_cell(0, 4.5, f"Clinical neural engine analysis complete. Bio-signature matched with high confidence. IGA Score: {iga_score}/4. GLOGAU: Type {glogau_score}. Skin Health: {skin_health_score}%.")
     pdf.ln(3)
 
     # CLINICAL RECOVERY PROTOCOL
-    pdf.set_fill_color(238, 238, 238)
+    pdf.set_fill_color(*bg_protocol_hdr)
     pdf.set_font("Arial", 'B', 10)
-    pdf.set_text_color(0, 0, 0)
+    pdf.set_text_color(*text_protocol_hdr)
     pdf.cell(0, 8, " [ EVIDENCE-BASED CLINICAL RECOVERY & MAINTENANCE PROTOCOL ]", ln=1, fill=True)
     pdf.ln(1)
 
     sections = [
-        ("AGE-SPECIFIC CLINICAL FOCUS:", age_focus, (180, 0, 0)),
-        (">> TOPICAL TREATMENT PROTOCOL (OTC + Rx):", topical_rx, (0, 100, 180)),
-        (">> PRESCRIPTION / PROCEDURAL OPTIONS:", prescription_rx, (130, 0, 130)),
-        (">> IN-OFFICE PROCEDURES (Dermatologist):", procedure_rx, (0, 130, 60)),
-        (">> LIFESTYLE & BEHAVIOURAL MEDICINE:", lifestyle_rx, (180, 100, 0)),
-        (">> NUTRITIONAL & SUPPLEMENTATION PLAN:", diet_plan, (0, 140, 80)),
+        ("AGE-SPECIFIC CLINICAL FOCUS:", age_focus),
+        (">> TOPICAL TREATMENT PROTOCOL (OTC + Rx):", topical_rx),
+        (">> PRESCRIPTION / PROCEDURAL OPTIONS:", prescription_rx),
+        (">> IN-OFFICE PROCEDURES (Dermatologist):", procedure_rx),
+        (">> LIFESTYLE & BEHAVIOURAL MEDICINE:", lifestyle_rx),
+        (">> NUTRITIONAL & SUPPLEMENTATION PLAN:", diet_plan),
         (">> OCULAR MAINTENANCE (Ophthalmology):",
-         f"Status: {eye_status} | FRUITS: {eye_rx.get('FRUITS','Carrots')} | SUPPLEMENT: {eye_rx.get('MED','Vitamin A')} | CARE: {eye_rx.get('CARE','20-20-20 Rule')}",
-         (0, 0, 180)),
+         f"Status: {eye_status} | FRUITS: {eye_rx.get('FRUITS','Carrots')} | SUPPLEMENT: {eye_rx.get('MED','Vitamin A')} | CARE: {eye_rx.get('CARE','20-20-20 Rule')}")
     ]
 
-    for heading, content, color in sections:
+    for idx, (heading, content) in enumerate(sections):
+        color = section_heading_colors[idx % len(section_heading_colors)]
         pdf.set_font("Arial", 'B', 8.5)
         pdf.set_text_color(*color)
         pdf.cell(0, 6, heading, ln=1)
         pdf.set_font("Arial", '', 8)
-        pdf.set_text_color(30, 30, 30)
+        pdf.set_text_color(*text_color)
         pdf.multi_cell(0, 4.5, content)
         pdf.ln(1.5)
 
     # FOOTER
     pdf.set_y(-15)
     pdf.set_font("Arial", 'I', 7)
-    pdf.set_text_color(130, 130, 130)
+    pdf.set_text_color(*footer_text_color)
     pdf.cell(0, 4, "VISION-AI CLINICAL SUITE | QUANTUM DERMATOLOGY EDITION 2026 | PAGE 2 OF 2 | SECURE DOCUMENT", ln=1, align='C')
     pdf.cell(0, 4, "THIS REPORT IS GENERATED BY A NEURAL CLINICAL ENGINE. ALWAYS CONSULT A DERMATOLOGIST FOR MEDICAL DECISIONS.", ln=1, align='C')
 
