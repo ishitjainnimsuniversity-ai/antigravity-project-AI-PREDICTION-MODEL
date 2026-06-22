@@ -4,3 +4,7 @@ tensorflow
 matplotlib
 pillow
 fpdf2
+scikit-image
+scipy
+scikit-learn
+opencv-python
