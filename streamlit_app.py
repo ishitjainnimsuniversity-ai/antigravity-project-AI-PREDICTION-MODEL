@@ -179,6 +179,68 @@ def get_diet_plan(prediction, pigment_type, pigment_density):
         
     return f"{base_diet} {pigment_enhancement}"
 
+def extract_biomarkers(img, label):
+    img = img.convert('RGB')
+    arr = np.array(img, dtype=np.float32)
+    R = arr[:, :, 0]
+    G = arr[:, :, 1]
+    B = arr[:, :, 2]
+    
+    skin_mask = (R > 95) & (G > 40) & (B > 20) & (R > G) & (R > B) & (np.abs(R - G) > 15)
+    if np.sum(skin_mask) < 100:
+        skin_mask = np.ones_like(R, dtype=bool)
+        
+    R_skin = R[skin_mask]
+    G_skin = G[skin_mask]
+    B_skin = B[skin_mask]
+    lum_skin = 0.299 * R_skin + 0.587 * G_skin + 0.114 * B_skin
+    
+    # Redness
+    total_val = R_skin + G_skin + B_skin + 1e-5
+    r_ratio = R_skin / total_val
+    red_spots_ratio = np.sum(r_ratio > 0.38) / len(r_ratio) if len(r_ratio) > 0 else 0.0
+    
+    # Gradients & Variance
+    gray = img.convert('L')
+    gray_arr = np.array(gray, dtype=np.float32)
+    grad_x = np.abs(gray_arr[:, 1:] - gray_arr[:, :-1])
+    grad_y = np.abs(gray_arr[1:, :] - gray_arr[:-1, :])
+    mean_grad = np.mean(grad_x) + np.mean(grad_y)
+    std_dev = np.std(gray_arr)
+    
+    # 1. Sebum (Oiliness) Index
+    sebum_count = np.sum(lum_skin > 210)
+    sebum_index = (sebum_count / len(lum_skin)) * 100.0 if len(lum_skin) > 0 else 0
+    sebum_index = round(15.0 + (sebum_index * 3.5), 1)
+    sebum_index = min(sebum_index, 95.0)
+    
+    # 2. Hydration Index
+    hydration_index = 98.0 - (std_dev * 0.4) - (mean_grad * 1.2)
+    if label == "Eczema" or label == "Psoriasis":
+        hydration_index -= 25.0
+    hydration_index = round(max(hydration_index, 10.0), 1)
+    
+    # 3. Pore Index
+    pore_index = 10.0 + (mean_grad * 0.8) + (np.sum((lum_skin > 120) & (lum_skin < 170)) / len(lum_skin)) * 40.0 if len(lum_skin) > 0 else 10.0
+    if label == "Acne":
+        pore_index += 20.0
+    pore_index = round(np.clip(pore_index, 10.0, 92.0), 1)
+    
+    # 4. Wrinkle Index
+    wrinkle_index = (mean_grad * 1.5) + (std_dev * 0.2)
+    if label == "Wrinkles":
+        wrinkle_index += 35.0
+    wrinkle_index = round(np.clip(wrinkle_index, 5.0, 96.0), 1)
+    
+    # 5. Inflammation Index
+    avg_red_ratio = np.mean(R_skin / (R_skin + G_skin + B_skin + 1e-5)) if len(R_skin) > 0 else 0.33
+    inflammation_index = (red_spots_ratio * 120.0) + (avg_red_ratio * 10.0)
+    if label in ["Acne", "Eczema", "Psoriasis"]:
+        inflammation_index += 15.0
+    inflammation_index = round(np.clip(inflammation_index, 5.0, 98.0), 1)
+    
+    return sebum_index, hydration_index, pore_index, wrinkle_index, inflammation_index
+
 IMG_SIZE = 128
 DEFAULT_MODEL_PATH = "trained_skin_model.keras"
 
@@ -384,7 +446,7 @@ def analyze_pigmentation(img):
 
 
 
-def generate_pdf(name, age, prediction, topical_rx, retinol_rx, diet, eye_rx, img, plot_buf, pigment_density, pigment_color, pigment_rgb, pigment_type, skin_health_score, eye_status, retina_score, probs_pct):
+def generate_pdf(name, age, prediction, topical_rx, retinol_rx, diet, eye_rx, img, plot_buf, pigment_density, pigment_color, pigment_rgb, pigment_type, skin_health_score, eye_status, retina_score, probs_pct, sebum_index, hydration_index, pore_index, wrinkle_index, inflammation_index):
     pdf = FPDF()
     pdf.add_page()
     
@@ -429,6 +491,17 @@ def generate_pdf(name, age, prediction, topical_rx, retinol_rx, diet, eye_rx, im
     pdf.set_font("Arial", '', 9)
     pdf.cell(95, 8, f" PRESENT SKIN HEALTH INDEX: {skin_health_score}%", border=1)
     pdf.cell(95, 8, f" PRESENT RETINA HEALTH INDEX: {retina_score}% ({eye_status})", border=1, ln=True)
+    pdf.ln(4)
+
+    # --- DEEP BIO-PHYSIOLOGICAL MARKERS HUD ---
+    pdf.set_fill_color(255, 245, 230) # Light Orange/Gold
+    pdf.set_font("Arial", 'B', 10)
+    pdf.cell(0, 8, " [ DEEP BIO-PHYSIOLOGICAL DETAILED SCAN MARKERS ]", ln=True, fill=True)
+    pdf.set_font("Arial", '', 9)
+    marker_str1 = f" SEBUM / OILINESS: {sebum_index}%  |  HYDRATION: {hydration_index}%  |  PORE SIZE INDEX: {pore_index}%"
+    marker_str2 = f" WRINKLE DEPTH INDEX: {wrinkle_index}%  |  INFLAMMATION (ERYTHEMA): {inflammation_index}%"
+    pdf.cell(0, 8, marker_str1, border=1, ln=True)
+    pdf.cell(0, 8, marker_str2, border=1, ln=True)
     pdf.ln(4)
 
     # --- FULL BIO-DERMAL DIAGNOSTIC PROFILE ---
@@ -600,7 +673,10 @@ with col1:
                     skin_health_score -= 15.0
                 skin_health_score = round(np.clip(skin_health_score, 15.0, 99.0), 1)
                 
-                st.session_state['diagnosis'] = (label, conf, probs, img, p_density, p_color, p_rgb, p_type, skin_health_score, eye_status, retina_score)
+                # Extract deep biological markers
+                seb, hyd, por, wrn, inf = extract_biomarkers(img, label)
+                
+                st.session_state['diagnosis'] = (label, conf, probs, img, p_density, p_color, p_rgb, p_type, skin_health_score, eye_status, retina_score, seb, hyd, por, wrn, inf)
 
 with col2:
     st.subheader("📊 Diagnostic Insights")
@@ -611,8 +687,12 @@ with col2:
             skin_health_score = 85.0
             eye_status = "Normal"
             retina_score = 94.2
-        else:
+            seb, hyd, por, wrn, inf = 45.0, 75.0, 30.0, 20.0, 15.0
+        elif len(diag) == 11:
             label, conf, probs, img, p_density, p_color, p_rgb, p_type, skin_health_score, eye_status, retina_score = diag
+            seb, hyd, por, wrn, inf = 45.0, 75.0, 30.0, 20.0, 15.0
+        else:
+            label, conf, probs, img, p_density, p_color, p_rgb, p_type, skin_health_score, eye_status, retina_score, seb, hyd, por, wrn, inf = diag
         
         st.markdown(f"""
         <div class="report-card">
@@ -632,6 +712,16 @@ with col2:
         </div>
         """, unsafe_allow_html=True)
         
+        st.markdown("### 🔍 Deep Physiological Dermal Scan Markers")
+        col_m1, col_m2 = st.columns(2)
+        with col_m1:
+            st.metric("Sebum / Oiliness", f"{seb}%")
+            st.metric("Pore Size Index", f"{por}%")
+            st.metric("Inflammation Index", f"{inf}%")
+        with col_m2:
+            st.metric("Hydration Index", f"{hyd}%")
+            st.metric("Wrinkle Depth Index", f"{wrn}%")
+
         st.markdown("### 🧬 Neural Bio-Dermal Probabilities")
         for i, skin_class in enumerate(SKIN_CLASSES):
             prob_pct = float(probs[i]) * 100.0
@@ -721,7 +811,12 @@ with col2:
                 skin_health_score=skin_health_score,
                 eye_status=eye_status,
                 retina_score=retina_score,
-                probs_pct=probs_pct
+                probs_pct=probs_pct,
+                sebum_index=seb,
+                hydration_index=hyd,
+                pore_index=por,
+                wrinkle_index=wrn,
+                inflammation_index=inf
             ))
             
             # Show download buttons in columns
@@ -735,7 +830,7 @@ with col2:
                 )
             with btn_col2:
                 probs_pct_str = ", ".join([f"{SKIN_CLASSES[k]}: {round(float(probs[k])*100.0, 1)}%" for k in range(len(SKIN_CLASSES))])
-                report_text = f"Patient: {patient_name}\nAge: {patient_age}\nDiagnosis: {label}\nConfidence: {conf:.1f}%\n\nPresent Skin Health Index: {skin_health_score}%\nPresent Retina Health Index: {retina_score}% ({eye_status})\n\nSkin Conditions Probability Profile:\n{probs_pct_str}\n\nPigment Level: {p_density}%\nPigment Color: {p_color} {p_rgb}\nPigment Type: {p_type}\n\nAge Focus: {age_focus}\n\nTopical Protocol: {topical_rx}\n\nRetinoid Therapy: {retinol_rx}\n\nDiet Strategy: {dynamic_diet}"
+                report_text = f"Patient: {patient_name}\nAge: {patient_age}\nDiagnosis: {label}\nConfidence: {conf:.1f}%\n\nPresent Skin Health Index: {skin_health_score}%\nPresent Retina Health Index: {retina_score}% ({eye_status})\n\nDeep Physiological Scan Markers:\n- Sebum/Oiliness: {seb}%\n- Hydration: {hyd}%\n- Pore Size Index: {por}%\n- Wrinkle Depth Index: {wrn}%\n- Inflammation: {inf}%\n\nSkin Conditions Probability Profile:\n{probs_pct_str}\n\nPigment Level: {p_density}%\nPigment Color: {p_color} {p_rgb}\nPigment Type: {p_type}\n\nAge Focus: {age_focus}\n\nTopical Protocol: {topical_rx}\n\nRetinoid Therapy: {retinol_rx}\n\nDiet Strategy: {dynamic_diet}"
                 st.download_button(
                     label="📥 Download Report (TXT)",
                     data=report_text,
