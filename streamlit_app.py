@@ -11,13 +11,17 @@ import urllib.request
 
 try:
     import cv2
-except ImportError:
+    cv2_import_error = None
+except Exception as e:
     cv2 = None
+    cv2_import_error = str(e)
 
 try:
     import mediapipe as mp
-except ImportError:
+    mp_import_error = None
+except Exception as e:
     mp = None
+    mp_import_error = str(e)
 
 # Model details for Face Mesh tasks API fallback
 MODEL_PATH = "face_landmarker.task"
@@ -1914,8 +1918,18 @@ with st.sidebar:
     enable_3d_paint = st.checkbox("🎭 Enable 3D Diagnostic Heatmap Paint", value=True)
     st.divider()
     st.markdown("**🩺 Clinical Engine Status**")
+    if cv2 is not None:
+        st.success("✅ OpenCV Image Engine: Online")
+    else:
+        st.error(f"❌ OpenCV Image Engine: Offline ({cv2_import_error})")
+        
+    if mp is not None:
+        st.success("✅ MediaPipe Face Mesh: Online")
+    else:
+        st.error(f"❌ MediaPipe Face Mesh: Offline ({mp_import_error})")
+
     st.success("✅ CIELab Colorimetry: Online")
-    st.success("✅ GLCM Texture Engine: Online")
+    st.success("✅ GLCM/LBP Texture Engine: Online")
     st.success("✅ Fitzpatrick Classifier: Online")
     st.success("✅ IGA / GLOGAU Scoring: Online")
     st.success("✅ Scikit-Learn Model: Calibrated")
