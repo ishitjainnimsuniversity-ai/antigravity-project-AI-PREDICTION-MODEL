@@ -1886,9 +1886,15 @@ def generate_routine_pdf(name, am_routine, pm_routine, theme="Clinical Lab Blue"
     pdf.multi_cell(0, 5, notice_text, border=1, align='C', fill=True)
     
     try:
-        return pdf.output()
+        out = pdf.output()
+        if isinstance(out, str):
+            return out.encode('latin-1')
+        return bytes(out)
     except Exception:
-        return bytes(pdf.output(), 'latin-1')
+        try:
+            return bytes(pdf.output(), 'latin-1')
+        except Exception:
+            return bytes(pdf.output())
 
 def generate_3d_topology_plot(img, skin_mask=None):
     # Convert PIL Image to grayscale
@@ -3146,7 +3152,7 @@ with col2:
                     help="Download calendar events for your AM/PM routine to import into Google Calendar or Apple Calendar."
                 )
             with btn_col2:
-                routine_pdf_bytes = generate_routine_pdf(patient_name, am_routine, pm_routine, theme=pdf_theme)
+                routine_pdf_bytes = bytes(generate_routine_pdf(patient_name, am_routine, pm_routine, theme=pdf_theme))
                 st.download_button(
                     label="📥 Download Printable Routine PDF",
                     data=routine_pdf_bytes,
