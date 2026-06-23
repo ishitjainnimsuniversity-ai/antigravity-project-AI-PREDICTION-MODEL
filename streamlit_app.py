@@ -1,6 +1,7 @@
 import streamlit as st
 import os
 import numpy as np
+import plotly.graph_objects as go
 from fpdf import FPDF
 import matplotlib.pyplot as plt
 from PIL import Image
@@ -1490,11 +1491,305 @@ def sanitize_text(text):
         return text.encode('ascii', 'replace').decode('ascii')
 
 
+
+# ==============================================================================
+# VISION-AI ADVANCED DERMATOLOGY SUITE EXTENSIONS
+# ==============================================================================
+
+INGREDIENT_DATABASE = {
+    "isopropyl myristate": {"rating": 5, "type": "Comedogenic", "desc": "Highly pore-clogging. Can trigger severe acne flare-ups in acne-prone skin.", "category": "avoid"},
+    "coconut oil": {"rating": 4, "type": "Comedogenic", "desc": "Highly comedogenic natural lipid. Heavy fatty acids block sebum escape.", "category": "avoid"},
+    "ethylhexyl palmitate": {"rating": 4, "type": "Comedogenic", "desc": "Popular ester used for smooth feel, but highly comedogenic.", "category": "avoid"},
+    "sodium lauryl sulfate": {"rating": 5, "type": "Irritant / Comedogenic", "desc": "Harsh surfactant that destroys skin barrier and clogs pores.", "category": "avoid"},
+    "laureth-4": {"rating": 5, "type": "Comedogenic", "desc": "Emulsifier with extremely high pore-clogging potential.", "category": "avoid"},
+    "wheat germ oil": {"rating": 5, "type": "Comedogenic", "desc": "One of the most comedogenic oils in skincare.", "category": "avoid"},
+    "algae extract": {"rating": 5, "type": "Comedogenic", "desc": "Can penetrate pores and accelerate comedone formation.", "category": "avoid"},
+    "lanolin": {"rating": 3, "type": "Comedogenic / Allergen", "desc": "Sheep wool derivative. Can clog pores and cause allergic contact dermatitis.", "category": "warning"},
+    "salicylic acid": {"rating": 0, "type": "Acne Fighter (BHA)", "desc": "Oil-soluble beta hydroxy acid. Penetrates deep into pores to dissolve sebum and dead cells.", "category": "beneficial"},
+    "benzoyl peroxide": {"rating": 0, "type": "Acne Fighter", "desc": "Antibacterial agent that kills C. acnes bacteria and reduces inflammation.", "category": "beneficial"},
+    "adapalene": {"rating": 0, "type": "Retinoid (Acne/Aging)", "desc": "Third-generation topical retinoid. Regulates cell turnover and prevents clogged pores.", "category": "beneficial"},
+    "niacinamide": {"rating": 0, "type": "Barrier / Brightener", "desc": "Vitamin B3. Reduces sebum production, strengthens skin barrier, and fades post-acne marks.", "category": "beneficial"},
+    "tea tree oil": {"rating": 0, "type": "Antiseptic", "desc": "Natural antibacterial properties to reduce acne inflammation.", "category": "beneficial"},
+    "alpha arbutin": {"rating": 0, "type": "Tyrosinase Inhibitor", "desc": "Fades hyperpigmentation, age spots, and melasma by inhibiting melanin production.", "category": "beneficial"},
+    "kojic acid": {"rating": 0, "type": "Brightener", "desc": "Fungal derivative. Fades discoloration and brightens skin tone.", "category": "beneficial"},
+    "vitamin c": {"rating": 0, "type": "Antioxidant", "desc": "Ascorbic acid. Neutralizes free radicals and fades dark spots.", "category": "beneficial"},
+    "glycolic acid": {"rating": 0, "type": "Exfoliant (AHA)", "desc": "Alpha hydroxy acid. Exfoliates dead skin cells, fading pigmentation.", "category": "beneficial"},
+    "hydroquinone": {"rating": 0, "type": "Prescription Depigmenting", "desc": "Gold standard for fading melasma. Must be used with caution and dermatologist guidance.", "category": "beneficial"}
+}
+
+TRANSLATIONS = {
+    "en": {
+        "report_title": " VISION-AI | CLINICAL DERMATOLOGY REPORT",
+        "encrypted_analysis": "ENCRYPTED CLINICAL ANALYSIS",
+        "reference_only": "FOR CLINICAL REFERENCE ONLY - CONSULT A DERMATOLOGIST FOR MEDICAL DECISIONS",
+        "patient_profile": " [ PATIENT BIO-PROFILE ]",
+        "name": " NAME: {}",
+        "age": " AGE: {} YEARS | AGE GROUP: {}",
+        "fitz_type": " FITZPATRICK TYPE: {}",
+        "uv_sens": " UV SENSITIVITY: {}",
+        "fitz_desc": " FITZPATRICK DESC: {}",
+        "scorecard": " [ INTEGRATED CLINICAL HEALTH SCORECARD ]",
+        "skin_health": " SKIN HEALTH INDEX: {}%",
+        "ocular_comfort": " OCULAR COMFORT INDEX: {}% ({})",
+        "focus_verification": " IMAGE FOCUS VERIFICATION: {}",
+        "adv_contrast": " ADVANCED CONTRAST: {}",
+        "visuals_title": " [ BASELINE SCAN, THERMAL PROFILE, UV DAMAGE & 10-YEAR PROJECTION ]",
+        "colorimetry_title": " [ CIELab COLORIMETRY ANALYSIS (Mexameter-Grade) ]",
+        "ita_angle": " ITA Angle: {} deg ",
+        "melanin_index": " MELANIN INDEX (MI): {}% (Normal: 20-50%)",
+        "severity_title": " [ VALIDATED CLINICAL SEVERITY SCORES ]",
+        "glogau_photoaging": " GLOGAU PHOTOAGING: Type {}/4",
+        "acne_stage": " ACNE STAGE: {}",
+        "photoaging_class": " PHOTOAGING CLASS: {}",
+        "pigment_title": " [ PIGMENTATION ANALYTICS ]",
+        "color_class": " COLOR CLASS: {}",
+        "pigment_type_lbl": " TYPE: {}",
+        "page_footer_1": "VISION-AI CLINICAL REPORT | PAGE 1 OF 2 | SECURE DOCUMENT",
+        "insights_title": " VISION-AI | CLINICAL DIAGNOSTIC INSIGHTS",
+        "recovery_sub": "PATIENT: {} | CLINICAL RECOVERY PROTOCOLS & DEEP BIOMARKERS",
+        "markers_title": " [ DEEP BIO-PHYSIOLOGICAL DERMAL SCAN MARKERS ]",
+        "probability_title": " [ NEURAL BIO-DERMAL PROBABILITY BREAKDOWN ]",
+        "primary_diag": " PRIMARY DIAGNOSIS: {}",
+        "protocol_title": " [ EVIDENCE-BASED CLINICAL RECOVERY & MAINTENANCE PROTOCOL ]",
+        "clinical_notice": " * CLINICAL NOTICE: THIS IS A SCREENING REPORT. Rx SUGGESTIONS REQUIRE DERMATOLOGIST CONSULTATION.",
+        "isotretinoin_warning": " * ISOTRETINOIN WARNING: REQUIRES STRICT LIVER/LIPID BLOOD PANEL MONITORING & iPLEDGE REGISTRATION.",
+        "page_footer_2": "VISION-AI CLINICAL SUITE | QUANTUM DERMATOLOGY EDITION 2026 | PAGE 2 OF 2 | SECURE DOCUMENT",
+        "engine_footer": "THIS REPORT IS GENERATED BY A NEURAL CLINICAL ENGINE. ALWAYS CONSULT A DERMATOLOGIST FOR MEDICAL DECISIONS."
+    },
+    "es": {
+        "report_title": " VISION-AI | INFORME DERMATOLOGICO CLINICO",
+        "encrypted_analysis": "ANALISIS CLINICO ENCRIPTADO",
+        "reference_only": "SOLO PARA REFERENCIA CLINICA - CONSULTE A UN DERMATOLOGO PARA DECISIONES MEDICAS",
+        "patient_profile": " [ BIOPERFIL DEL PACIENTE ]",
+        "name": " NOMBRE: {}",
+        "age": " EDAD: {} AÑOS | GRUPO DE EDAD: {}",
+        "fitz_type": " TIPO FITZPATRICK: {}",
+        "uv_sens": " SENSIBILIDAD UV: {}",
+        "fitz_desc": " DESC. FITZPATRICK: {}",
+        "scorecard": " [ CUADRO DE MANDO INTEGRADO DE SALUD CLINICA ]",
+        "skin_health": " INDICE DE SALUD DE LA PIEL: {}%",
+        "ocular_comfort": " INDICE DE CONFORT OCULAR: {}% ({})",
+        "focus_verification": " VERIFICACION DE ENFOQUE DE IMAGEN: {}",
+        "adv_contrast": " CONTRASTE AVANZADO: {}",
+        "visuals_title": " [ ESCANER BASE, PERFIL TERMICO, DAÑO UV Y PROYECCION A 10 AÑOS ]",
+        "colorimetry_title": " [ ANALISIS DE COLORIMETRIA CIELab (Grado Mexameter) ]",
+        "ita_angle": " Angulo ITA: {} grados ",
+        "melanin_index": " INDICE DE MELANINA (MI): {}% (Normal: 20-50%)",
+        "severity_title": " [ PUNTUACIONES DE SEVERIDAD CLINICA VALIDADAS ]",
+        "glogau_photoaging": " FOTOENVEJECIMIENTO GLOGAU: Tipo {}/4",
+        "acne_stage": " ESTADO DEL ACNE: {}",
+        "photoaging_class": " CLASE DE FOTOENVEJECIMIENTO: {}",
+        "pigment_title": " [ ANALISIS DE PIGMENTACION ]",
+        "color_class": " CLASE DE COLOR: {}",
+        "pigment_type_lbl": " TIPO: {}",
+        "page_footer_1": "INFORME CLINICO DE VISION-AI | PAGINA 1 DE 2 | DOCUMENTO SEGURO",
+        "insights_title": " VISION-AI | INFORMACION DIAGNOSTICA CLINICA",
+        "recovery_sub": "PACIENTE: {} | PROTOCOLOS DE RECUPERACION CLINICA Y BIOMARCADORES",
+        "markers_title": " [ MARCADORES DE ESCANEO DERMICO BIOFISIOLOGICO PROFUNDO ]",
+        "probability_title": " [ DESGLOSE DE PROBABILIDAD NEURAL BIODERMICA ]",
+        "primary_diag": " DIAGNOSTICO PRIMARIO: {}",
+        "protocol_title": " [ PROTOCOLO DE RECUPERACION Y MANTENIMIENTO CLINICO BASADO EN EVIDENCIA ]",
+        "clinical_notice": " * AVISO CLINICO: ESTE INFORME ES DE CRIBADO. LAS SUGERENCIAS DE RECUPERACION REQUIEREN DERMATOLOGO.",
+        "isotretinoin_warning": " * ALERTA DE ISOTRETINOINA: REQUIERE ANALISIS DE SANGRE (PERFIL LIPIDICO/HEPATICO) Y REGISTRO iPLEDGE.",
+        "page_footer_2": "VISION-AI CLINICAL SUITE | EDICION DERMATOLOGIA CUANTICA 2026 | PAGINA 2 DE 2 | DOCUMENTO SEGURO",
+        "engine_footer": "ESTE INFORME ES GENERADO POR UN MOTOR NEURAL. CONSULTE SIEMPRE A UN DERMATOLOGO PARA DECISIONES MEDICAS."
+    },
+    "fr": {
+        "report_title": " VISION-AI | RAPPORT DE DERMATOLOGIE CLINIQUE",
+        "encrypted_analysis": "ANALYSE CLINIQUE CHIFFREE",
+        "reference_only": "POUR REFERENCE CLINIQUE UNIQUEMENT - CONSULTEZ UN DERMATOLOGUE POUR LES DECISIONS MEDICALES",
+        "patient_profile": " [ PROFIL BIOLOGIQUE DU PATIENT ]",
+        "name": " NOM: {}",
+        "age": " AGE: {} ANS | GROUPE D'AGE: {}",
+        "fitz_type": " TYPE FITZPATRICK: {}",
+        "uv_sens": " SENSIBILITE UV: {}",
+        "fitz_desc": " DESCRIPTION FITZPATRICK: {}",
+        "scorecard": " [ FICHE D'EVALUATION CLINIQUE DE LA SANTE ]",
+        "skin_health": " INDICE DE SANTE DE LA PEAU: {}%",
+        "ocular_comfort": " INDICE DE CONFORT OCULAIRE: {}% ({})",
+        "focus_verification": " VERIFICATION DE LA MISE AU POINT DE L'IMAGE: {}",
+        "adv_contrast": " CONTRASTE AVANCE: {}",
+        "visuals_title": " [ SCAN DE BASE, PROFIL THERMIQUE, DOMMAGES UV ET PROJECTION A 10 ANS ]",
+        "colorimetry_title": " [ ANALYSE COLORIMETRIQUE CIELab (Qualite Mexametre) ]",
+        "ita_angle": " Angle ITA: {} degres ",
+        "melanin_index": " INDICE DE MELANINE (MI): {}% (Normal: 20-50%)",
+        "severity_title": " [ SCORES DE SEVERITE CLINIQUE VALIDES ]",
+        "glogau_photoaging": " VIEILLISSEMENT GLOGAU: Type {}/4",
+        "acne_stage": " STADE DE L'ACNE: {}",
+        "photoaging_class": " CLASSE DE VIEILLISSEMENT: {}",
+        "pigment_title": " [ ANALYSE DE LA PIGMENTATION ]",
+        "color_class": " CLASSE DE COULEUR: {}",
+        "pigment_type_lbl": " TYPE: {}",
+        "page_footer_1": "RAPPORT CLINIQUE VISION-AI | PAGE 1 SUR 2 | DOCUMENT SECURISE",
+        "insights_title": " VISION-AI | ANALYSES DIAGNOSTIQUES CLINIQUES",
+        "recovery_sub": "PATIENT: {} | PROTOCOLES DE RECUPERATION ET BIOMARQUEURS",
+        "markers_title": " [ MARQUEURS DU SCAN DERMIQUE DE LA PEAU PROFONDE ]",
+        "probability_title": " [ REPARTITION NEURALE DES PROBABILITES BIODERMIQUES ]",
+        "primary_diag": " DIAGNOSTIC PRIMAIRE: {}",
+        "protocol_title": " [ PROTOCOLE DE RECUPERATION ET DE MAINTENANCE CLINIQUE BASE SUR DES PREUVES ]",
+        "clinical_notice": " * AVIS CLINIQUE: RAPPORT DE DEPISTAGE. LES SUGGESTIONS DOIVENT ETRE VALIDEES PAR UN DERMATOLOGUE.",
+        "isotretinoin_warning": " * ALERTE ISOTRETINOINE: NECESSITE UN BILAN SANGUIN (FOIE/LIPIDES) ET INSCRIPTION iPLEDGE.",
+        "page_footer_2": "VISION-AI CLINICAL SUITE | EDITION DERMATOLOGIE QUANTIQUE 2026 | PAGE 2 SUR 2 | DOCUMENT SECURISE",
+        "engine_footer": "RAPPORT GENERE PAR UN MOTEUR NEURAL. CONSULTEZ UN DERMATOLOGUE POUR TOUTE DECISION MEDICALE."
+    }
+}
+
+def t(text, lang="en"):
+    if lang == "en":
+        return text
+    if text in TRANSLATIONS[lang]:
+        return TRANSLATIONS[lang][text]
+    # Check partial mappings
+    for k, v in TRANSLATIONS[lang].items():
+        if k.strip() in text:
+            # We replace only the key and preserve formatting
+            return text.replace(k.strip(), v.strip())
+    return text
+
+def get_custom_routine(prediction, fitzpatrick_type):
+    prediction = prediction.lower()
+    am_steps = []
+    pm_steps = []
+    
+    if "acne" in prediction or "seborrheic" in prediction:
+        am_steps.append("1. Cleanser: Gentle Salicylic Acid Cleanser (2%) to clear sebum channels.")
+    else:
+        am_steps.append("1. Cleanser: Hydrating Cream Cleanser to protect the skin barrier.")
+        
+    if "acne" in prediction:
+        am_steps.append("2. Treatment: Niacinamide (5%) or Topical Clindamycin (if prescribed) to reduce acne redness.")
+    elif "pigmentation" in prediction or "melasma" in prediction:
+        am_steps.append("2. Treatment: Vitamin C Serum (10-15%) or Alpha Arbutin to brighten pigment zones.")
+    elif "psoriasis" in prediction or "eczema" in prediction:
+        am_steps.append("2. Treatment: Hyaluronic Acid Serum + Soothing Centella Asiatica to restore hydration.")
+    else:
+        am_steps.append("2. Treatment: Vitamin C Serum or Hyaluronic Acid for antioxidant protection.")
+        
+    if "acne" in prediction or "seborrheic" in prediction:
+        am_steps.append("3. Moisturizer: Lightweight, Oil-Free Gel Moisturizer (non-comedogenic).")
+    else:
+        am_steps.append("3. Moisturizer: Ceramide-rich Hydrating Moisturizer.")
+        
+    if fitzpatrick_type in [1, 2]:
+        am_steps.append("4. Sunscreen: Broad-spectrum mineral SPF 50+ (High UV Sensitivity).")
+    else:
+        am_steps.append("4. Sunscreen: Broad-spectrum SPF 30-50 (Standard UV Protection).")
+        
+    pm_steps.append("1. Double Cleansing: Micellar Water followed by your standard Cleanser to strip SPF/pollution.")
+    
+    if "acne" in prediction:
+        pm_steps.append("2. Active Treatment: Adapalene Gel (0.1%) or Benzoyl Peroxide (2.5%) (apply thin layer).")
+    elif "pigmentation" in prediction or "melasma" in prediction:
+        pm_steps.append("2. Active Treatment: Retinol (0.5%) or Glycolic Acid (AHA) to accelerate cell turnover.")
+    elif "psoriasis" in prediction or "eczema" in prediction:
+        pm_steps.append("2. Active Treatment: Topical corticosteroids (as prescribed) or heavy barrier ointment.")
+    else:
+        pm_steps.append("2. Active Treatment: Gentle Retinol (0.25%) or Peptide Serum for bio-stability.")
+        
+    pm_steps.append("3. Night Moisturizer: Rich Ceramide & Squalane Barrier Repair Cream.")
+    
+    return "\n".join(am_steps), "\n".join(pm_steps)
+
+def generate_ics_calendar(routine_am, routine_pm):
+    now = datetime.datetime.now().strftime("%Y%m%dT%H%M%SZ")
+    today = datetime.datetime.now()
+    
+    ics_lines = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//Vision-AI//Skincare Routine//EN",
+        "CALSCALE:GREGORIAN",
+        "METHOD:PUBLISH"
+    ]
+    
+    # Standard 7-day routine events
+    for day in range(7):
+        event_date = (today + datetime.timedelta(days=day)).strftime("%Y%m%d")
+        
+        # AM Event description cleanup
+        desc_am = routine_am.replace("\n", " \n ").replace(",", "\\,")
+        desc_pm = routine_pm.replace("\n", " \n ").replace(",", "\\,")
+        
+        ics_lines.extend([
+            "BEGIN:VEVENT",
+            f"UID:vision_ai_am_{event_date}@vision-ai.app",
+            f"DTSTAMP:{now}",
+            f"DTSTART;VALUE=DATE-TIME:{event_date}T080000",
+            f"DTEND;VALUE=DATE-TIME:{event_date}T081500",
+            "SUMMARY:Vision-AI: Morning Skincare Routine",
+            f"DESCRIPTION:{desc_am}",
+            "RRULE:FREQ=DAILY;COUNT=1",
+            "BEGIN:VALARM",
+            "TRIGGER:-PT10M",
+            "ACTION:DISPLAY",
+            "DESCRIPTION:Skincare Routine Alert",
+            "END:VALARM",
+            "END:VEVENT"
+        ])
+        
+        ics_lines.extend([
+            "BEGIN:VEVENT",
+            f"UID:vision_ai_pm_{event_date}@vision-ai.app",
+            f"DTSTAMP:{now}",
+            f"DTSTART;VALUE=DATE-TIME:{event_date}T210000",
+            f"DTEND;VALUE=DATE-TIME:{event_date}T211500",
+            "SUMMARY:Vision-AI: Evening Skincare Routine",
+            f"DESCRIPTION:{desc_pm}",
+            "RRULE:FREQ=DAILY;COUNT=1",
+            "BEGIN:VALARM",
+            "TRIGGER:-PT10M",
+            "ACTION:DISPLAY",
+            "DESCRIPTION:Skincare Routine Alert",
+            "END:VALARM",
+            "END:VEVENT"
+        ])
+        
+    ics_lines.append("END:VCALENDAR")
+    return "\n".join(ics_lines)
+
+def generate_3d_topology_plot(img, skin_mask=None):
+    # Convert PIL Image to grayscale
+    gray = img.convert('L')
+    gray_np = np.array(gray)
+    
+    # We downsample the heightmap grid to 60x60 to keep rendering ultra fast in Streamlit
+    h, w = gray_np.shape
+    step_y = max(1, h // 60)
+    step_x = max(1, w // 60)
+    
+    z_data = gray_np[::step_y, ::step_x].astype(float)
+    
+    if skin_mask is not None:
+        mask_np = np.array(skin_mask)
+        mask_sub = mask_np[::step_y, ::step_x]
+        # Where skin mask is False, set values to NaN so Plotly doesn't draw them
+        z_data = np.where(mask_sub > 0, z_data, np.nan)
+        
+    x = np.arange(z_data.shape[1])
+    y = np.arange(z_data.shape[0])
+    
+    fig = go.Figure(data=[go.Surface(z=z_data, x=x, y=y, colorscale='Cividis')])
+    fig.update_layout(
+        title='3D Skin Surface Roughness Topology Map',
+        autosize=True,
+        scene=dict(
+            xaxis=dict(title='Width (px)', backgroundcolor="rgb(10, 10, 26)", gridcolor="rgb(50, 60, 100)", showbackground=True),
+            yaxis=dict(title='Height (px)', backgroundcolor="rgb(10, 10, 26)", gridcolor="rgb(50, 60, 100)", showbackground=True),
+            zaxis=dict(title='Texture Depth', backgroundcolor="rgb(10, 10, 26)", gridcolor="rgb(50, 60, 100)", showbackground=True, range=[0, 255]),
+            aspectratio=dict(x=1, y=1, z=0.4)
+        ),
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        margin=dict(l=10, r=10, t=40, b=10)
+    )
+    return fig
+
+
 def generate_clinical_pdf(name, age, prediction, clinical_data, age_focus,
                            topical_rx, prescription_rx, procedure_rx, lifestyle_rx,
                            diet_plan, eye_rx, img, thermal_img, uv_img, plot_buf,
                            skin_health_score, eye_status, retina_score,
-                           probs, iga_score, glogau_score, theme="Clinical Lab Blue"):
+                           probs, iga_score, glogau_score, theme="Clinical Lab Blue", lang="en"):
     # Sanitize all string inputs to prevent FPDF font encoding errors
     name = sanitize_text(name)
     prediction = sanitize_text(prediction)
@@ -1615,56 +1910,56 @@ def generate_clinical_pdf(name, age, prediction, clinical_data, age_focus,
         pdf.set_fill_color(15, 10, 25)
         pdf.rect(0, 0, 210, 36, 'F')
         pdf.set_text_color(255, 0, 128)
-        pdf.set_font("Arial", 'B', 18)
-        pdf.cell(0, 14, " VISION-AI | CLINICAL DERMATOLOGY REPORT", ln=1, align='C')
-        pdf.set_font("Arial", 'I', 8)
+        pdf.set_font("Helvetica", 'B', 18)
+        pdf.cell(0, 14, t(" VISION-AI | CLINICAL DERMATOLOGY REPORT", lang), ln=1, align='C')
+        pdf.set_font("Helvetica", 'I', 8)
         pdf.set_text_color(0, 255, 240)
     elif theme == "Apothecary Earth":
         pdf.set_fill_color(60, 70, 50)
         pdf.rect(0, 0, 210, 36, 'F')
         pdf.set_text_color(235, 225, 205)
-        pdf.set_font("Arial", 'B', 18)
-        pdf.cell(0, 14, " VISION-AI | CLINICAL DERMATOLOGY REPORT", ln=1, align='C')
-        pdf.set_font("Arial", 'I', 8)
+        pdf.set_font("Helvetica", 'B', 18)
+        pdf.cell(0, 14, t(" VISION-AI | CLINICAL DERMATOLOGY REPORT", lang), ln=1, align='C')
+        pdf.set_font("Helvetica", 'I', 8)
         pdf.set_text_color(190, 140, 100)
     else:
         pdf.set_fill_color(8, 15, 50)
         pdf.rect(0, 0, 210, 36, 'F')
         pdf.set_text_color(0, 210, 255)
-        pdf.set_font("Arial", 'B', 18)
-        pdf.cell(0, 14, " VISION-AI | CLINICAL DERMATOLOGY REPORT", ln=1, align='C')
-        pdf.set_font("Arial", 'I', 8)
+        pdf.set_font("Helvetica", 'B', 18)
+        pdf.cell(0, 14, t(" VISION-AI | CLINICAL DERMATOLOGY REPORT", lang), ln=1, align='C')
+        pdf.set_font("Helvetica", 'I', 8)
         pdf.set_text_color(200, 220, 255)
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    pdf.cell(0, 5, f"ENCRYPTED CLINICAL ANALYSIS | SESSION: {timestamp} | AES-256 SECURED", ln=1, align='C')
-    pdf.cell(0, 5, "FOR CLINICAL REFERENCE ONLY - CONSULT A DERMATOLOGIST FOR MEDICAL DECISIONS", ln=1, align='C')
+    pdf.cell(0, 5, t("ENCRYPTED CLINICAL ANALYSIS", lang) + f" | SESSION: {timestamp} | AES-256 SECURED", ln=1, align='C')
+    pdf.cell(0, 5, t("FOR CLINICAL REFERENCE ONLY - CONSULT A DERMATOLOGIST FOR MEDICAL DECISIONS", lang), ln=1, align='C')
     pdf.ln(8)
 
     # PATIENT PROFILE
     pdf.set_text_color(*text_color)
     pdf.set_fill_color(*bg_profile)
-    pdf.set_font("Arial", 'B', 9)
-    pdf.cell(0, 7, " [ PATIENT BIO-PROFILE ]", ln=1, fill=True)
-    pdf.set_font("Arial", '', 8.5)
+    pdf.set_font("Helvetica", 'B', 9)
+    pdf.cell(0, 7, t(" [ PATIENT BIO-PROFILE ]", lang), ln=1, fill=True)
+    pdf.set_font("Helvetica", '', 8.5)
     fitz_info = FITZPATRICK_SCALE.get(clinical_data['fitzpatrick_type'], FITZPATRICK_SCALE[3])
     fitz_name = sanitize_text(fitz_info['name'])
     fitz_desc = sanitize_text(fitz_info['desc'])
     fitz_spf = sanitize_text(fitz_info['spf'])
     
-    pdf.cell(95, 7, f" NAME: {name.upper()}", border=1)
-    pdf.cell(95, 7, f" AGE: {age} YEARS | AGE GROUP: {get_age_group(age)}", border=1, ln=1)
-    pdf.cell(95, 7, f" FITZPATRICK TYPE: {fitz_name}", border=1)
-    pdf.cell(95, 7, f" UV SENSITIVITY: {fitz_spf}", border=1, ln=1)
-    pdf.cell(0, 7, f" FITZPATRICK DESC: {fitz_desc}", border=1, ln=1)
+    pdf.cell(95, 7, t(" NAME: ", lang).format(name.upper()), border=1)
+    pdf.cell(95, 7, t(" AGE: ", lang).format(age) + " " + t(" YEARS | ", lang) + t(" AGE GROUP: ", lang).format(get_age_group(age)), border=1, ln=1)
+    pdf.cell(95, 7, t(" FITZPATRICK TYPE: ", lang).format(fitz_name), border=1)
+    pdf.cell(95, 7, t(" UV SENSITIVITY: ", lang).format(fitz_spf), border=1, ln=1)
+    pdf.cell(0, 7, t(" FITZPATRICK DESC: ", lang).format(fitz_desc), border=1, ln=1)
     pdf.ln(3)
 
     # INTEGRATED HEALTH SCORECARD
     pdf.set_fill_color(*bg_scorecard)
-    pdf.set_font("Arial", 'B', 9)
-    pdf.cell(0, 7, " [ INTEGRATED CLINICAL HEALTH SCORECARD ]", ln=1, fill=True)
-    pdf.set_font("Arial", '', 8.5)
-    pdf.cell(95, 7, f" SKIN HEALTH INDEX: {skin_health_score}%", border=1)
-    pdf.cell(95, 7, f" OCULAR COMFORT INDEX: {retina_score}% ({eye_status})", border=1, ln=1)
+    pdf.set_font("Helvetica", 'B', 9)
+    pdf.cell(0, 7, t(" [ INTEGRATED CLINICAL HEALTH SCORECARD ]", lang), ln=1, fill=True)
+    pdf.set_font("Helvetica", '', 8.5)
+    pdf.cell(95, 7, t(" SKIN HEALTH INDEX: ", lang).format(skin_health_score), border=1)
+    pdf.cell(95, 7, t(" OCULAR COMFORT INDEX: ", lang).format(retina_score, eye_status), border=1, ln=1)
     
     # Image preprocessing & quality check
     is_blurry = clinical_data.get("is_blurry", False)
@@ -1678,14 +1973,14 @@ def generate_clinical_pdf(name, age, prediction, clinical_data, age_focus,
     
     clahe_str = "ACTIVE (CLAHE Enhanced)" if use_clahe else "STANDARD (Disabled)"
     
-    pdf.cell(95, 7, f" IMAGE FOCUS VERIFICATION: {quality_str}", border=1)
-    pdf.cell(95, 7, f" ADVANCED CONTRAST: {clahe_str}", border=1, ln=1)
+    pdf.cell(95, 7, t(" IMAGE FOCUS VERIFICATION: ", lang).format(quality_str), border=1)
+    pdf.cell(95, 7, t(" ADVANCED CONTRAST: ", lang).format(clahe_str), border=1, ln=1)
     pdf.ln(3)
 
     # VISUALS (2x2 grid: face, thermal, uv, plot) - PLACED PROMINENTLY ON PAGE 1
     pdf.set_fill_color(*bg_visuals)
-    pdf.set_font("Arial", 'B', 9)
-    pdf.cell(0, 7, " [ BASELINE SCAN, THERMAL PROFILE, UV DAMAGE & 10-YEAR PROJECTION ]", ln=1, fill=True)
+    pdf.set_font("Helvetica", 'B', 9)
+    pdf.cell(0, 7, t(" [ BASELINE SCAN, THERMAL PROFILE, UV DAMAGE & 10-YEAR PROJECTION ]", lang), ln=1, fill=True)
     pdf.ln(2)
     y_vis = pdf.get_y()
     
@@ -1724,45 +2019,45 @@ def generate_clinical_pdf(name, age, prediction, clinical_data, age_focus,
 
     # COLORIMETRY HUD (CIELab)
     pdf.set_fill_color(*bg_colorimetry)
-    pdf.set_font("Arial", 'B', 9)
-    pdf.cell(0, 7, " [ CIELab COLORIMETRY ANALYSIS (Mexameter-Grade) ]", ln=1, fill=True)
-    pdf.set_font("Arial", '', 8.5)
+    pdf.set_font("Helvetica", 'B', 9)
+    pdf.cell(0, 7, t(" [ CIELab COLORIMETRY ANALYSIS (Mexameter-Grade) ]", lang), ln=1, fill=True)
+    pdf.set_font("Helvetica", '', 8.5)
     pdf.cell(42, 7, f" L* (Lightness): {clinical_data['L_star']}", border=1)
     pdf.cell(42, 7, f" a* (Redness): {clinical_data['a_star']}", border=1)
     pdf.cell(42, 7, f" b* (Yellowness): {clinical_data['b_star']}", border=1)
-    pdf.cell(64, 7, f" ITA Angle: {clinical_data['ita_deg']} deg ", border=1, ln=1)
+    pdf.cell(64, 7, t(" ITA Angle: ", lang).format(clinical_data['ita_deg']), border=1, ln=1)
     pdf.cell(95, 7, f" ERYTHEMA INDEX (EI): {clinical_data['erythema_index']}% (Normal: 0-15%)", border=1)
-    pdf.cell(95, 7, f" MELANIN INDEX (MI): {clinical_data['melanin_index']}% (Normal: 20-50%)", border=1, ln=1)
+    pdf.cell(95, 7, t(" MELANIN INDEX (MI): ", lang).format(clinical_data['melanin_index']), border=1, ln=1)
     pdf.ln(3)
 
     # CLINICAL SEVERITY SCORES
     pdf.set_fill_color(*bg_severity)
-    pdf.set_font("Arial", 'B', 9)
-    pdf.cell(0, 7, " [ VALIDATED CLINICAL SEVERITY SCORES ]", ln=1, fill=True)
-    pdf.set_font("Arial", '', 8.5)
+    pdf.set_font("Helvetica", 'B', 9)
+    pdf.cell(0, 7, t(" [ VALIDATED CLINICAL SEVERITY SCORES ]", lang), ln=1, fill=True)
+    pdf.set_font("Helvetica", '', 8.5)
     iga_text = sanitize_text(IGA_SCALE.get(iga_score, 'N/A'))
     pdf.cell(95, 7, f" IGA ACNE SCORE: {iga_score}/4", border=1)
-    pdf.cell(95, 7, f" GLOGAU PHOTOAGING: Type {glogau_score}/4", border=1, ln=1)
-    pdf.cell(0, 7, f" ACNE STAGE: {iga_text[:110]}", border=1, ln=1)
+    pdf.cell(95, 7, t(" GLOGAU PHOTOAGING: Type ", lang).format(glogau_score), border=1, ln=1)
+    pdf.cell(0, 7, t(" ACNE STAGE: ", lang).format(iga_text[:110]), border=1, ln=1)
     glogau_text = sanitize_text(GLOGAU_SCALE.get(glogau_score, ""))
-    pdf.cell(0, 7, f" PHOTOAGING CLASS: {glogau_text[:110]}", border=1, ln=1)
+    pdf.cell(0, 7, t(" PHOTOAGING CLASS: ", lang).format(glogau_text[:110]), border=1, ln=1)
     pdf.ln(3)
 
     # PIGMENTATION
     pdf.set_fill_color(*bg_pigment)
-    pdf.set_font("Arial", 'B', 9)
-    pdf.cell(0, 7, " [ PIGMENTATION ANALYTICS ]", ln=1, fill=True)
-    pdf.set_font("Arial", '', 8.5)
+    pdf.set_font("Helvetica", 'B', 9)
+    pdf.cell(0, 7, t(" [ PIGMENTATION ANALYTICS ]", lang), ln=1, fill=True)
+    pdf.set_font("Helvetica", '', 8.5)
     pdf.cell(60, 7, f" DENSITY: {clinical_data['pigment_density']}%", border=1)
     pdf.cell(50, 7, f" RGB: {clinical_data['pigment_rgb']}", border=1)
-    pdf.cell(80, 7, f" COLOR CLASS: {clinical_data['pigment_color']}", border=1, ln=1)
-    pdf.cell(0, 7, f" TYPE: {clinical_data['pigment_type']}", border=1, ln=1)
+    pdf.cell(80, 7, t(" COLOR CLASS: ", lang).format(clinical_data['pigment_color']), border=1, ln=1)
+    pdf.cell(0, 7, t(" TYPE: ", lang).format(clinical_data['pigment_type']), border=1, ln=1)
     
     # Footer for Page 1
     pdf.set_y(-15)
-    pdf.set_font("Arial", 'I', 7)
+    pdf.set_font("Helvetica", 'I', 7)
     pdf.set_text_color(*footer_text_color)
-    pdf.cell(0, 4, "VISION-AI CLINICAL REPORT | PAGE 1 OF 2 | SECURE DOCUMENT", ln=1, align='C')
+    pdf.cell(0, 4, t("VISION-AI CLINICAL REPORT | PAGE 1 OF 2 | SECURE DOCUMENT", lang), ln=1, align='C')
 
     # ==========================================
     # PAGE 2: DEEP BIOMARKERS & RECOVERY PLAN
@@ -1777,36 +2072,36 @@ def generate_clinical_pdf(name, age, prediction, clinical_data, age_focus,
         pdf.set_fill_color(15, 10, 25)
         pdf.rect(0, 0, 210, 25, 'F')
         pdf.set_text_color(255, 0, 128)
-        pdf.set_font("Arial", 'B', 13)
-        pdf.cell(0, 9, " VISION-AI | CLINICAL DIAGNOSTIC INSIGHTS", ln=1, align='C')
-        pdf.set_font("Arial", 'I', 7.5)
+        pdf.set_font("Helvetica", 'B', 13)
+        pdf.cell(0, 9, t(" VISION-AI | CLINICAL DIAGNOSTIC INSIGHTS", lang), ln=1, align='C')
+        pdf.set_font("Helvetica", 'I', 7.5)
         pdf.set_text_color(0, 255, 240)
     elif theme == "Apothecary Earth":
         pdf.set_fill_color(60, 70, 50)
         pdf.rect(0, 0, 210, 25, 'F')
         pdf.set_text_color(235, 225, 205)
-        pdf.set_font("Arial", 'B', 13)
-        pdf.cell(0, 9, " VISION-AI | CLINICAL DIAGNOSTIC INSIGHTS", ln=1, align='C')
-        pdf.set_font("Arial", 'I', 7.5)
+        pdf.set_font("Helvetica", 'B', 13)
+        pdf.cell(0, 9, t(" VISION-AI | CLINICAL DIAGNOSTIC INSIGHTS", lang), ln=1, align='C')
+        pdf.set_font("Helvetica", 'I', 7.5)
         pdf.set_text_color(190, 140, 100)
     else:
         # Default Clinical
         pdf.set_fill_color(8, 15, 50)
         pdf.rect(0, 0, 210, 25, 'F')
         pdf.set_text_color(0, 210, 255)
-        pdf.set_font("Arial", 'B', 13)
-        pdf.cell(0, 9, " VISION-AI | CLINICAL DIAGNOSTIC INSIGHTS", ln=1, align='C')
-        pdf.set_font("Arial", 'I', 7.5)
+        pdf.set_font("Helvetica", 'B', 13)
+        pdf.cell(0, 9, t(" VISION-AI | CLINICAL DIAGNOSTIC INSIGHTS", lang), ln=1, align='C')
+        pdf.set_font("Helvetica", 'I', 7.5)
         pdf.set_text_color(200, 220, 255)
-    pdf.cell(0, 4, f"PATIENT: {name.upper()} | CLINICAL RECOVERY PROTOCOLS & DEEP BIOMARKERS", ln=1, align='C')
+    pdf.cell(0, 4, t("PATIENT: ", lang).format(name.upper()) + t(" | CLINICAL RECOVERY PROTOCOLS & DEEP BIOMARKERS", lang), ln=1, align='C')
     pdf.ln(6)
 
     # DEEP BIO-PHYSIOLOGICAL MARKERS
     pdf.set_text_color(*text_color)
     pdf.set_fill_color(*bg_scorecard)
-    pdf.set_font("Arial", 'B', 9)
-    pdf.cell(0, 7, " [ DEEP BIO-PHYSIOLOGICAL DERMAL SCAN MARKERS ]", ln=1, fill=True)
-    pdf.set_font("Arial", '', 8.5)
+    pdf.set_font("Helvetica", 'B', 9)
+    pdf.cell(0, 7, t(" [ DEEP BIO-PHYSIOLOGICAL DERMAL SCAN MARKERS ]", lang), ln=1, fill=True)
+    pdf.set_font("Helvetica", '', 8.5)
     m1 = f" SEBUM/OILINESS: {clinical_data['sebum_index']}%  |  HYDRATION: {clinical_data['hydration_index']}%  |  TEWL PROXY: {clinical_data['tewl_proxy']} g/m2h"
     m2 = f" PORE SIZE INDEX: {clinical_data['pore_index']}%  |  WRINKLE DEPTH: {clinical_data['wrinkle_index']}%  |  INFLAMMATION: {clinical_data['inflammation_index']}%"
     m3 = f" BARRIER INTEGRITY: {clinical_data['barrier_score']}%  |  UV DAMAGE SCORE: {clinical_data['uv_damage_score']}%  |  LESION COUNT: {clinical_data['lesion_count']}"
@@ -1817,9 +2112,9 @@ def generate_clinical_pdf(name, age, prediction, clinical_data, age_focus,
 
     # PROBABILITY BREAKDOWN
     pdf.set_fill_color(*bg_probability)
-    pdf.set_font("Arial", 'B', 9)
-    pdf.cell(0, 7, " [ NEURAL BIO-DERMAL PROBABILITY BREAKDOWN ]", ln=1, fill=True)
-    pdf.set_font("Arial", '', 8.5)
+    pdf.set_font("Helvetica", 'B', 9)
+    pdf.cell(0, 7, t(" [ NEURAL BIO-DERMAL PROBABILITY BREAKDOWN ]", lang), ln=1, fill=True)
+    pdf.set_font("Helvetica", '', 8.5)
     probs_pct = [round(float(p)*100, 1) for p in probs]
     prob_str1 = f" HEALTHY SKIN: {probs_pct[4]}%  |  ACNE: {probs_pct[0]}%  |  ECZEMA: {probs_pct[1]}%"
     prob_str2 = f" PSORIASIS: {probs_pct[2]}%  |  WRINKLES: {probs_pct[3]}%"
@@ -1830,8 +2125,8 @@ def generate_clinical_pdf(name, age, prediction, clinical_data, age_focus,
     # DIAGNOSTIC CORE
     pdf.set_fill_color(*bg_diagnostic)
     pdf.set_text_color(*text_diagnostic)
-    pdf.set_font("Arial", 'B', 11)
-    pdf.cell(0, 10, f" PRIMARY DIAGNOSIS: {prediction.upper()}", ln=1, fill=True)
+    pdf.set_font("Helvetica", 'B', 11)
+    pdf.cell(0, 10, t(" PRIMARY DIAGNOSIS: ", lang).format(prediction.upper()), ln=1, fill=True)
     pdf.set_text_color(*text_color)
     pdf.set_font("Courier", '', 8.5)
     pdf.ln(1)
@@ -1840,15 +2135,15 @@ def generate_clinical_pdf(name, age, prediction, clinical_data, age_focus,
 
     # CLINICAL RECOVERY PROTOCOL
     pdf.set_fill_color(*bg_protocol_hdr)
-    pdf.set_font("Arial", 'B', 10)
+    pdf.set_font("Helvetica", 'B', 10)
     pdf.set_text_color(*text_protocol_hdr)
-    pdf.cell(0, 8, " [ EVIDENCE-BASED CLINICAL RECOVERY & MAINTENANCE PROTOCOL ]", ln=1, fill=True)
+    pdf.cell(0, 8, t(" [ EVIDENCE-BASED CLINICAL RECOVERY & MAINTENANCE PROTOCOL ]", lang), ln=1, fill=True)
     
     # Official Medical Warning/Disclaimer
-    pdf.set_font("Arial", 'B', 7)
+    pdf.set_font("Helvetica", 'B', 7)
     pdf.set_text_color(180, 50, 50) # Muted red warning color
-    pdf.cell(0, 4.5, " * CLINICAL NOTICE: THIS IS A SCREENING REPORT. Rx SUGGESTIONS REQUIRE DERMATOLOGIST CONSULTATION.", ln=1)
-    pdf.cell(0, 4.5, " * ISOTRETINOIN WARNING: REQUIRES STRICT LIVER/LIPID BLOOD PANEL MONITORING & iPLEDGE REGISTRATION.", ln=1)
+    pdf.cell(0, 4.5, t(" * CLINICAL NOTICE: THIS IS A SCREENING REPORT. Rx SUGGESTIONS REQUIRE DERMATOLOGIST CONSULTATION.", lang), ln=1)
+    pdf.cell(0, 4.5, t(" * ISOTRETINOIN WARNING: REQUIRES STRICT LIVER/LIPID BLOOD PANEL MONITORING & iPLEDGE REGISTRATION.", lang), ln=1)
     pdf.ln(1)
 
     sections = [
@@ -1864,20 +2159,20 @@ def generate_clinical_pdf(name, age, prediction, clinical_data, age_focus,
 
     for idx, (heading, content) in enumerate(sections):
         color = section_heading_colors[idx % len(section_heading_colors)]
-        pdf.set_font("Arial", 'B', 8.5)
+        pdf.set_font("Helvetica", 'B', 8.5)
         pdf.set_text_color(*color)
         pdf.cell(0, 6, heading, ln=1)
-        pdf.set_font("Arial", '', 8)
+        pdf.set_font("Helvetica", '', 8)
         pdf.set_text_color(*text_color)
         pdf.multi_cell(0, 4.5, content)
         pdf.ln(0.8) # compressed gap to fit warning cleanly
 
     # FOOTER
     pdf.set_y(-15)
-    pdf.set_font("Arial", 'I', 7)
+    pdf.set_font("Helvetica", 'I', 7)
     pdf.set_text_color(*footer_text_color)
-    pdf.cell(0, 4, "VISION-AI CLINICAL SUITE | QUANTUM DERMATOLOGY EDITION 2026 | PAGE 2 OF 2 | SECURE DOCUMENT", ln=1, align='C')
-    pdf.cell(0, 4, "THIS REPORT IS GENERATED BY A NEURAL CLINICAL ENGINE. ALWAYS CONSULT A DERMATOLOGIST FOR MEDICAL DECISIONS.", ln=1, align='C')
+    pdf.cell(0, 4, t("VISION-AI CLINICAL SUITE | QUANTUM DERMATOLOGY EDITION 2026 | PAGE 2 OF 2 | SECURE DOCUMENT", lang), ln=1, align='C')
+    pdf.cell(0, 4, t("THIS REPORT IS GENERATED BY A NEURAL CLINICAL ENGINE. ALWAYS CONSULT A DERMATOLOGIST FOR MEDICAL DECISIONS.", lang), ln=1, align='C')
 
     try:
         return pdf.output()
@@ -1910,6 +2205,10 @@ with st.sidebar:
     st.divider()
     # Theme Selection
     st.markdown("**🎨 Report Customization**")
+    st.markdown("**🌐 Language Settings**")
+    lang_choice = st.selectbox("Select Language / Idioma / Langue", ["English", "Español", "Français"])
+    lang_code = {"English": "en", "Español": "es", "Français": "fr"}[lang_choice]
+    st.divider()
     pdf_theme = st.selectbox("Clinical PDF Theme", ["Clinical Lab Blue", "Dark Cyberpunk", "Apothecary Earth"])
     st.divider()
     
@@ -2264,7 +2563,7 @@ with col2:
                 st.write(f"- **{name}**: {imp*100:.1f}% importance")
 
         # Treatment tabs
-        tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["💊 Clinical Protocol", "🥗 Nutrition", "📈 Bio-Forecast", "📋 Pigmentation", "📈 Monitoring & History", "💬 AI Consultant"])
+        tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["💊 Clinical Protocol", "🥗 Nutrition", "📈 Bio-Forecast", "📋 Pigmentation", "📈 Monitoring & History", "🔍 Ingredient Checker", "💬 AI Consultant"])
 
         age_focus, topical_rx, prescription_rx, procedure_rx, lifestyle_rx = get_clinical_plan(
             label, patient_age, cd['pigment_type'], cd['pigment_density'])
@@ -2300,6 +2599,27 @@ with col2:
             st.markdown("**🏃 Lifestyle & Behavioural Medicine:**")
             st.write(lifestyle_rx)
             st.warning("⚠️ **Clinical Notice**: Always consult a board-certified dermatologist before starting any prescription. Potent therapies like oral Isotretinoin (Accutane) require regular blood panel checks (liver/lipids) and medical monitoring.")
+            
+            st.markdown("---")
+            st.subheader("☀️ Daily AM/PM Personalized Recovery Routine")
+            am_routine, pm_routine = get_custom_routine(label, cd['fitzpatrick_type'])
+            
+            rout_col1, rout_col2 = st.columns(2)
+            with rout_col1:
+                st.markdown("☀️ **Morning Routine (AM)**")
+                st.info(am_routine.replace("\\n", "\n"))
+            with rout_col2:
+                st.markdown("🌙 **Evening Routine (PM)**")
+                st.success(pm_routine.replace("\\n", "\n"))
+                
+            ics_content = generate_ics_calendar(am_routine, pm_routine)
+            st.download_button(
+                label="📅 Export 7-Day Routine to Calendar (.ics)",
+                data=ics_content,
+                file_name=f"SkincareRoutine_{patient_name.replace(' ','_')}.ics",
+                mime="text/calendar",
+                help="Download calendar events for your AM/PM routine to import into Google Calendar or Apple Calendar."
+            )
 
         with tab2:
             for line in dynamic_diet.split("\n\n"):
@@ -2413,6 +2733,73 @@ with col2:
                 st.pyplot(fig_history)
 
         with tab6:
+            st.markdown("### 🔍 Skincare Ingredient & Product Compatibility Checker")
+            st.markdown("Paste the ingredients list of any skincare product (e.g., cleanser, moisturizer, serum) below. The engine will check for comedogenic ratings, common allergens, active acne-fighters, and calculate a compatibility score for your skin profile.")
+            
+            user_ingredients = st.text_area(
+                "Paste Ingredients (comma-separated):",
+                placeholder="Water, Glycerin, Coconut Oil, Salicylic Acid, Ethylhexyl Palmitate, Niacinamide...",
+                key="ingredients_checker_textarea"
+            )
+            
+            if user_ingredients:
+                clean_ingredients = [i.strip().lower() for i in user_ingredients.split(",") if i.strip()]
+                
+                avoid_list = []
+                warning_list = []
+                beneficial_list = []
+                
+                for ing in clean_ingredients:
+                    found = False
+                    for key, details in INGREDIENT_DATABASE.items():
+                        if ing == key or key in ing:
+                            found = True
+                            if details["category"] == "avoid":
+                                avoid_list.append((ing, details))
+                            elif details["category"] == "warning":
+                                warning_list.append((ing, details))
+                            elif details["category"] == "beneficial":
+                                beneficial_list.append((ing, details))
+                            break
+                    if not found:
+                        pass
+                
+                score = 100
+                score -= len(avoid_list) * 25
+                score -= len(warning_list) * 10
+                score = max(0, min(100, score))
+                
+                if score >= 80:
+                    st.success(f"💚 **Skin Compatibility Score: {score}%** (High Compatibility)")
+                elif score >= 50:
+                    st.warning(f"💛 **Skin Compatibility Score: {score}%** (Moderate Compatibility - Use with Caution)")
+                else:
+                    st.error(f"❤️ **Skin Compatibility Score: {score}%** (Low Compatibility - Not Recommended)")
+                    
+                col_i1, col_i2, col_i3 = st.columns(3)
+                with col_i1:
+                    st.markdown("🚨 **Avoid (Pore-Clogging / Comedogenic)**")
+                    if avoid_list:
+                        for ing, details in avoid_list:
+                            st.error(f"**{ing.title()}** (Rating: {details['rating']}/5)\n\n_{details['desc']}_")
+                    else:
+                        st.write("None detected.")
+                with col_i2:
+                    st.markdown("⚠️ **Caution (Mild Irritants / Blockers)**")
+                    if warning_list:
+                        for ing, details in warning_list:
+                            st.warning(f"**{ing.title()}** (Rating: {details['rating']}/5)\n\n_{details['desc']}_")
+                    else:
+                        st.write("None detected.")
+                with col_i3:
+                    st.markdown("✨ **Beneficial Actives**")
+                    if beneficial_list:
+                        for ing, details in beneficial_list:
+                            st.info(f"**{ing.title()}** ({details['type']})\n\n_{details['desc']}_")
+                    else:
+                        st.write("None detected.")
+
+        with tab7:
             st.markdown("### 💬 AI Dermatological Consultant (Clinical Consult)")
             st.markdown("###### Ask follow-up questions about your recovery protocol, dietary rules, or biomarker indices.")
             
@@ -2543,7 +2930,7 @@ with col2:
                 diet_plan=dynamic_diet, eye_rx=eye_rx_data,
                 img=img, thermal_img=cd.get("thermal_img", None), uv_img=cd.get("uv_img", None), plot_buf=pdf_plot_buf,
                 skin_health_score=shs, eye_status=es, retina_score=rs,
-                probs=probs, iga_score=iga, glogau_score=glogau, theme=pdf_theme
+                probs=probs, iga_score=iga, glogau_score=glogau, theme=pdf_theme, lang=lang_code
             ))
 
             btn1, btn2 = st.columns(2)
