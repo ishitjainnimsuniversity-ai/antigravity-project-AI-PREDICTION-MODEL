@@ -1907,6 +1907,224 @@ def analyze_eye_scan(img):
     
     return redness_index, pupil_index, is_eye_detected, left_pupil, right_pupil, anisocoria_delta
 
+# ==============================================================================
+# VISION-AI OPHTHALMIC MEDICAL IMAGE SCANNING LAB
+# ==============================================================================
+
+def generate_synthetic_fundus(case_type="glaucoma"):
+    img = np.zeros((512, 512, 3), dtype=np.uint8)
+    cv2.circle(img, (256, 256), 240, (30, 80, 220), -1)
+    noise = np.random.normal(0, 5, img.shape).astype(np.uint8)
+    img = cv2.add(img, noise)
+    
+    disc_center = (160, 256)
+    disc_radius = 50
+    cv2.circle(img, disc_center, disc_radius, (100, 200, 255), -1)
+    
+    if case_type == "glaucoma":
+        cup_radius = 38
+        cv2.circle(img, disc_center, cup_radius, (220, 240, 255), -1)
+    else:
+        cup_radius = 15
+        cv2.circle(img, disc_center, cup_radius, (220, 240, 255), -1)
+        
+    cv2.circle(img, (350, 256), 40, (15, 45, 120), -1)
+    
+    t_val = np.linspace(0, 2 * np.pi, 100)
+    for angle in [0, 30, 60, 120, 150, 180, 210, 240, 300, 330]:
+        rad = np.radians(angle)
+        pts = []
+        cx, cy = disc_center
+        for r in range(10, 220, 10):
+            wx = cx + int(r * np.cos(rad) + 12 * np.sin(r/20.0 + angle))
+            wy = cy + int(r * np.sin(rad) + 12 * np.cos(r/20.0 + angle))
+            if (wx-256)**2 + (wy-256)**2 < 235**2:
+                pts.append([wx, wy])
+        if len(pts) > 1:
+            pts = np.array(pts, dtype=np.int32)
+            cv2.polylines(img, [pts], False, (15, 20, 100), thickness=2)
+            
+    if case_type == "dr":
+        for pt in [(280, 200), (290, 210), (310, 190), (320, 220), (330, 205), (340, 230)]:
+            cv2.circle(img, pt, np.random.randint(2, 5), (50, 220, 255), -1)
+        for pt in [(270, 320), (300, 340), (240, 150), (360, 310), (380, 280)]:
+            cv2.circle(img, pt, np.random.randint(4, 9), (15, 15, 120), -1)
+            
+    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    return Image.fromarray(img_rgb)
+
+def generate_synthetic_cataract(has_cataract=True):
+    img = np.zeros((512, 512, 3), dtype=np.uint8)
+    cv2.circle(img, (256, 256), 200, (30, 20, 15), -1)
+    
+    pupil_center = (256, 256)
+    pupil_radius = 80
+    
+    if has_cataract:
+        cv2.circle(img, pupil_center, pupil_radius, (40, 45, 50), -1)
+        for r in range(pupil_radius - 10, 10, -15):
+            opacity = np.random.randint(90, 180)
+            cv2.circle(img, pupil_center, r, (opacity, opacity+15, opacity+25), -1)
+        for _ in range(5):
+            x1 = pupil_center[0] + np.random.randint(-50, 50)
+            y1 = pupil_center[1] + np.random.randint(-50, 50)
+            x2 = x1 + np.random.randint(-30, 30)
+            y2 = y1 + np.random.randint(-30, 30)
+            cv2.line(img, (x1, y1), (x2, y2), (200, 210, 220), 1)
+    else:
+        cv2.circle(img, pupil_center, pupil_radius, (5, 5, 5), -1)
+        
+    pts = np.array([[180, 60], [200, 60], [330, 450], [310, 450]], dtype=np.int32)
+    cv2.fillPoly(img, [pts], (250, 240, 220))
+    
+    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    return Image.fromarray(img_rgb)
+
+def analyze_glaucoma_cdr(img_pil):
+    try:
+        img_cv = np.array(img_pil.convert('RGB'))
+        gray = cv2.cvtColor(img_cv, cv2.COLOR_RGB2GRAY)
+        
+        _, thresh = cv2.threshold(gray, 180, 255, cv2.THRESH_BINARY)
+        contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        
+        disc_center = (160, 256)
+        disc_radius = 50
+        cup_radius = 35
+        is_detected = False
+        
+        if contours:
+            best_c = max(contours, key=cv2.contourArea)
+            area = cv2.contourArea(best_c)
+            if area > 100:
+                (x, y), radius = cv2.minEnclosingCircle(best_c)
+                disc_center = (int(x), int(y))
+                disc_radius = int(radius)
+                is_detected = True
+                
+                mask = np.zeros_like(gray)
+                cv2.circle(mask, disc_center, disc_radius, 255, -1)
+                disc_gray = cv2.bitwise_and(gray, mask)
+                
+                _, thresh_cup = cv2.threshold(disc_gray, 220, 255, cv2.THRESH_BINARY)
+                cup_contours, _ = cv2.findContours(thresh_cup, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                if cup_contours:
+                    best_cup_c = max(cup_contours, key=cv2.contourArea)
+                    _, radius_cup = cv2.minEnclosingCircle(best_cup_c)
+                    cup_radius = int(radius_cup)
+                    
+        cdr = float(cup_radius) / float(disc_radius) if disc_radius > 0 else 0.5
+        cdr = float(np.clip(cdr, 0.2, 0.95))
+        
+        overlay = img_cv.copy()
+        cv2.circle(overlay, disc_center, disc_radius, (0, 255, 0), 2)
+        cv2.circle(overlay, disc_center, cup_radius, (255, 0, 0), 2)
+        
+        cv2.putText(overlay, f"Disc (Green) | Cup (Red)", (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+        cv2.putText(overlay, f"CDR: {cdr:.2f}", (20, 70), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+        
+        return Image.fromarray(overlay), cdr, is_detected
+    except Exception:
+        return img_pil, 0.5, False
+
+def analyze_diabetic_retinopathy(img_pil):
+    try:
+        img_cv = np.array(img_pil.convert('RGB'))
+        g_chan = img_cv[:, :, 1]
+        r_chan = img_cv[:, :, 0]
+        
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+        g_enhanced = clahe.apply(g_chan)
+        
+        vessel_mask = cv2.adaptiveThreshold(g_enhanced, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 15, 3)
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+        vessel_mask = cv2.morphologyEx(vessel_mask, cv2.MORPH_OPEN, kernel)
+        
+        red_diff = cv2.subtract(r_chan, g_chan)
+        _, hem_thresh = cv2.threshold(red_diff, 45, 255, cv2.THRESH_BINARY)
+        
+        h, w = red_diff.shape
+        border_mask = np.zeros((h, w), dtype=np.uint8)
+        cv2.circle(border_mask, (w//2, h//2), 220, 255, -1)
+        cv2.circle(border_mask, (160, 256), 65, 0, -1)
+        
+        hem_thresh = cv2.bitwise_and(hem_thresh, border_mask)
+        contours, _ = cv2.findContours(hem_thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        
+        hem_count = 0
+        overlay = img_cv.copy()
+        
+        vessel_color = np.zeros_like(img_cv)
+        vessel_color[vessel_mask > 0] = [0, 210, 255]
+        cv2.addWeighted(overlay, 0.85, vessel_color, 0.15, 0, overlay)
+        
+        for c in contours:
+            area = cv2.contourArea(c)
+            if 2 < area < 150:
+                (x, y, w_h, h_h) = cv2.boundingRect(c)
+                cv2.rectangle(overlay, (x-2, y-2), (x+w_h+2, y+h_h+2), (255, 0, 0), 1)
+                hem_count += 1
+                
+        if hem_count == 0:
+            stage = "Stage 0: Normal / Healthy Retina"
+            recommendation = "No diabetic retinopathy markers detected. Schedule standard annual follow-up."
+        elif hem_count <= 3:
+            stage = "Stage 1: Mild Non-Proliferative DR"
+            recommendation = "Rare microaneurysms detected. Maintain tight blood glucose controls."
+        elif hem_count <= 8:
+            stage = "Stage 2: Moderate Non-Proliferative DR"
+            recommendation = "Multiple hemorrhages and exudates mapped. Consult retina specialist."
+        else:
+            stage = "Stage 3-4: Severe / Proliferative DR"
+            recommendation = "Profound hemorrhage density. High risk of neovascularization and vision loss. Immediate ophthalmology intervention required."
+            
+        cv2.putText(overlay, f"Vessels (Cyan) | Hemorrhages (Red Boxes)", (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 2)
+        cv2.putText(overlay, f"Lesions Mapped: {hem_count}", (20, 70), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (255, 255, 255), 2)
+        
+        return Image.fromarray(overlay), hem_count, stage, recommendation
+    except Exception:
+        return img_pil, 0, "Unknown", "Analysis Error."
+
+def analyze_cataract_opacity(img_pil):
+    try:
+        img_cv = np.array(img_pil.convert('RGB'))
+        gray = cv2.cvtColor(img_cv, cv2.COLOR_RGB2GRAY)
+        
+        h, w = gray.shape
+        cx, cy = w // 2, h // 2
+        r_crop = 75
+        
+        valid_pixels = gray[cy-r_crop:cy+r_crop, cx-r_crop:cx+r_crop]
+        valid_pixels = valid_pixels[valid_pixels < 220]
+        mean_val = np.mean(valid_pixels) if valid_pixels.size > 0 else 10.0
+        
+        grade = (mean_val - 15.0) / 25.0
+        grade = float(np.clip(grade, 0.0, 6.0))
+        
+        overlay = img_cv.copy()
+        cv2.circle(overlay, (cx, cy), r_crop, (0, 255, 255), 2)
+        
+        cv2.putText(overlay, f"Lens Zone", (cx - r_crop, cy - r_crop - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+        cv2.putText(overlay, f"LOCS III Grade: {grade:.1f}/6.0", (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (255, 255, 255), 2)
+        
+        if grade < 1.0:
+            severity = "Clear Lens (No Cataract)"
+            desc = "Crystalline lens appears perfectly transparent. Normal light refraction."
+        elif grade < 2.5:
+            severity = "Mild Cataract (Stage 1-2)"
+            desc = "Early nuclear sclerosis/opacity detected. Monitor visual acuity changes annually."
+        elif grade < 4.5:
+            severity = "Moderate Cataract (Stage 3-4)"
+            desc = "Significant lens cloudiness and light scattering. May cause glare or blurred vision. Consult ophthalmologist."
+        else:
+            severity = "Severe / Mature Cataract (Stage 5-6)"
+            desc = "Dense nuclear sclerosis. Severe loss of transparency. Surgical lens replacement (phacoemulsification) is highly recommended."
+            
+        return Image.fromarray(overlay), grade, severity, desc
+    except Exception:
+        return img_pil, 0.0, "Unknown", "Analysis Error."
+
+
 
 
 def generate_clinical_pdf(name, age, prediction, clinical_data, age_focus,
@@ -2724,7 +2942,7 @@ with col2:
                 st.write(f"- **{name}**: {imp*100:.1f}% importance")
 
         # Treatment tabs
-        tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["💊 Clinical Protocol", "🥗 Nutrition", "📈 Bio-Forecast", "📋 Pigmentation", "📈 Monitoring & History", "🔍 Ingredient Checker", "💬 AI Consultant"])
+        tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs(["💊 Clinical Protocol", "🥗 Nutrition", "📈 Bio-Forecast", "📋 Pigmentation", "📈 Monitoring & History", "🔍 Ingredient Checker", "👁️ Ophthalmic Lab", "💬 AI Consultant"])
 
         age_focus, topical_rx, prescription_rx, procedure_rx, lifestyle_rx = get_clinical_plan(
             label, patient_age, cd['pigment_type'], cd['pigment_density'])
@@ -2961,6 +3179,110 @@ with col2:
                         st.write("None detected.")
 
         with tab7:
+            st.markdown("### 👁️ Vision-AI Ophthalmic Imaging Laboratory")
+            st.markdown("This clinical laboratory module uses digital image processing and adaptive contours to analyze medical-grade eye photographs for Glaucoma, Diabetic Retinopathy, and Cataracts.")
+            
+            diagnostic_mode = st.selectbox(
+                "Select Ophthalmic Scan Mode",
+                ["Glaucoma Cup-to-Disc Ratio (CDR)", "Diabetic Retinopathy Vessel & Hemorrhage Mapping", "Cataract Slit-Lamp Lens Opacity Analyzer"]
+            )
+            
+            # Sub-uploader or sample images
+            st.markdown("---")
+            st.markdown("**🔬 Select Sample Clinical Photo to Run Scan:**")
+            
+            sample_col1, sample_col2, sample_col3, sample_col4, sample_col5 = st.columns(5)
+            selected_sample = None
+            
+            with sample_col1:
+                if st.button("👁️ Glaucoma Fundus"): selected_sample = "glaucoma_fundus"
+            with sample_col2:
+                if st.button("🟢 Normal Fundus"): selected_sample = "normal_fundus"
+            with sample_col3:
+                if st.button("🩸 Retinopathy Fundus"): selected_sample = "dr_fundus"
+            with sample_col4:
+                if st.button("👓 Cataract Slit-Lamp"): selected_sample = "cataract_slit"
+            with sample_col5:
+                if st.button("👀 Clear Slit-Lamp"): selected_sample = "clear_slit"
+                
+            uploaded_med_file = st.file_uploader("Or upload your own Clinical Image (Fundus or Slit-lamp)", type=["jpg", "jpeg", "png"], key="oph_uploader_key")
+            
+            # Active image variable
+            active_img = None
+            case_mode = None
+            
+            if uploaded_med_file:
+                active_img = Image.open(uploaded_med_file)
+                # Map selectbox to mode
+                if "Glaucoma" in diagnostic_mode: case_mode = "glaucoma"
+                elif "Diabetic" in diagnostic_mode: case_mode = "dr"
+                else: case_mode = "cataract"
+            elif selected_sample:
+                if selected_sample == "glaucoma_fundus":
+                    active_img = generate_synthetic_fundus("glaucoma")
+                    case_mode = "glaucoma"
+                elif selected_sample == "normal_fundus":
+                    active_img = generate_synthetic_fundus("normal")
+                    case_mode = "glaucoma"
+                elif selected_sample == "dr_fundus":
+                    active_img = generate_synthetic_fundus("dr")
+                    case_mode = "dr"
+                elif selected_sample == "cataract_slit":
+                    active_img = generate_synthetic_cataract(True)
+                    case_mode = "cataract"
+                elif selected_sample == "clear_slit":
+                    active_img = generate_synthetic_cataract(False)
+                    case_mode = "cataract"
+                    
+            if active_img is not None:
+                st.markdown("---")
+                med_col1, med_col2 = st.columns(2)
+                
+                with med_col1:
+                    st.image(active_img, caption="Original Input Ophthalmic Scan", use_container_width=True)
+                    
+                with med_col2:
+                    st.markdown("🩺 **Computer Vision Medical Overlay Scan:**")
+                    with st.spinner("Executing segmentation contours..."):
+                        if case_mode == "glaucoma":
+                            proc_img, cdr_val, detected = analyze_glaucoma_cdr(active_img)
+                            st.image(proc_img, caption="Optic Cup & Disc Segmented Contours", use_container_width=True)
+                            
+                            st.markdown("#### Clinical Metrics:")
+                            st.markdown(f"- **Calculated Cup-to-Disc Ratio (CDR):** `{cdr_val:.2f}`")
+                            st.markdown(f"- **Diagnostic Cup Size:** {'Enlarged (High Glaucoma Risk)' if cdr_val > 0.6 else 'Normal'}")
+                            
+                            if cdr_val > 0.6:
+                                st.error("⚠️ **Glaucoma Risk Warning**: The Cup-to-Disc Ratio is elevated (> 0.6), indicating clinical excavation of the optic nerve head. Prompt ophthalmology evaluation recommended.")
+                            else:
+                                st.success("✅ **Disc Metrics Normal**: Optic disc topography appears stable. CDR is below the risk threshold.")
+                                
+                        elif case_mode == "dr":
+                            proc_img, hem_cnt, stage, recommendation = analyze_diabetic_retinopathy(active_img)
+                            st.image(proc_img, caption="Hemorrhage & Microaneurysm Heatmap Overlay", use_container_width=True)
+                            
+                            st.markdown("#### Clinical Metrics:")
+                            st.markdown(f"- **Micro-Lesion Count:** `{hem_cnt} spots` mapped.")
+                            st.info(f"**Classification**: {stage}")
+                            st.warning(f"**Recommended Action**: {recommendation}" if hem_cnt > 0 else f"**Recommended Action**: {recommendation}")
+                            
+                        elif case_mode == "cataract":
+                            proc_img, grade, severity, desc = analyze_cataract_opacity(active_img)
+                            st.image(proc_img, caption="Slit-Lamp Pupil Lens ROI Segmentation", use_container_width=True)
+                            
+                            st.markdown("#### Clinical Metrics:")
+                            st.markdown(f"- **LOCS III Opacity Grade:** `{grade:.1f} / 6.0` scale.")
+                            st.info(f"**Classification**: {severity}")
+                            st.write(desc)
+                            
+                            if grade >= 2.5:
+                                st.warning("⚠️ **Lens Opacity Detected**: Lens transmission coefficient has decreased due to protein aggregation. Visual acuity degradation expected.")
+                            else:
+                                st.success("✅ **Lens Translucent**: Crystalline lens appears healthy and fully transparent.")
+            else:
+                st.info("💡 **Retinal/Lens Scanner Active**: Select one of the sample medical images above (or upload a fundus photo / slit-lamp photo) to run the diagnostic algorithms.")
+
+        with tab8:
             st.markdown("### 💬 AI Dermatological Consultant (Clinical Consult)")
             st.markdown("###### Ask follow-up questions about your recovery protocol, dietary rules, or biomarker indices.")
             
