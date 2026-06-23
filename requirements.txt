@@ -7,3 +7,4 @@ scipy
 scikit-learn
 opencv-python-headless
 mediapipe
+plotly
