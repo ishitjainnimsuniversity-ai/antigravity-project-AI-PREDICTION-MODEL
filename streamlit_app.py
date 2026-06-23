@@ -1888,31 +1888,6 @@ def generate_clinical_pdf(name, age, prediction, clinical_data, age_focus,
 # SECTION 5 — STREAMLIT UI
 # ============================================================
 
-IMG_SIZE = 128
-DEFAULT_MODEL_PATH = "trained_skin_model.keras"
-
-@st.cache_resource
-def get_model():
-    import tensorflow as tf
-    from tensorflow.keras import layers, models
-    if os.path.exists(DEFAULT_MODEL_PATH):
-        try:
-            return tf.keras.models.load_model(DEFAULT_MODEL_PATH)
-        except Exception:
-            pass
-    base_model = tf.keras.applications.MobileNetV2(
-        input_shape=(IMG_SIZE, IMG_SIZE, 3), include_top=False, weights='imagenet')
-    base_model.trainable = False
-    model = models.Sequential([
-        layers.Input(shape=(IMG_SIZE, IMG_SIZE, 3)),
-        base_model, layers.GlobalAveragePooling2D(),
-        layers.Dense(256, activation='relu'), layers.BatchNormalization(),
-        layers.Dropout(0.4), layers.Dense(128, activation='relu'),
-        layers.Dense(len(SKIN_CLASSES), activation='softmax')
-    ])
-    model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
-    return model
-
 
 # UI LAYOUT
 if 'patient_history' not in st.session_state:
