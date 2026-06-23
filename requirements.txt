@@ -1,6 +1,5 @@
 streamlit
 numpy
-tensorflow
 matplotlib
 pillow
 fpdf2
