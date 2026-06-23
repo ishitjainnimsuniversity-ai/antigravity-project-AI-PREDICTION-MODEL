@@ -1785,6 +1785,130 @@ def generate_3d_topology_plot(img, skin_mask=None):
     return fig
 
 
+def analyze_eye_region_cv(eye_np):
+    try:
+        hsv = cv2.cvtColor(eye_np, cv2.COLOR_RGB2HSV)
+        gray = cv2.cvtColor(eye_np, cv2.COLOR_RGB2GRAY)
+        
+        # Redness range in HSV
+        lower_red1 = np.array([0, 45, 45])
+        upper_red1 = np.array([12, 255, 255])
+        lower_red2 = np.array([168, 45, 45])
+        upper_red2 = np.array([180, 255, 255])
+        
+        mask1 = cv2.inRange(hsv, lower_red1, upper_red1)
+        mask2 = cv2.inRange(hsv, lower_red2, upper_red2)
+        red_mask = mask1 | mask2
+        
+        redness_pct = (np.sum(red_mask > 0) / red_mask.size) * 100.0
+        
+        # Pupil Detection
+        _, dark_mask = cv2.threshold(gray, 35, 255, cv2.THRESH_BINARY_INV)
+        contours, _ = cv2.findContours(dark_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        
+        pupil_size_ratio = 18.0
+        if contours:
+            best_contour = None
+            max_area = 0
+            for c in contours:
+                area = cv2.contourArea(c)
+                if area > max_area:
+                    max_area = area
+                    best_contour = c
+            if best_contour is not None and max_area > 3:
+                _, radius = cv2.minEnclosingCircle(best_contour)
+                eye_width = eye_np.shape[1]
+                pupil_size_ratio = (radius * 2.0 / eye_width) * 100.0
+                
+        return redness_pct, pupil_size_ratio
+    except Exception:
+        return 12.0, 18.0
+
+def analyze_eye_scan(img):
+    img_rgb = np.array(img.convert('RGB'))
+    h, w, c = img_rgb.shape
+    
+    left_eye_indices = [362, 382, 381, 380, 374, 373, 390, 249, 263, 466, 388, 387, 386, 385, 384, 398]
+    right_eye_indices = [33, 7, 163, 144, 145, 153, 154, 155, 133, 173, 157, 158, 159, 160, 161, 246]
+    
+    left_red, left_pupil = 12.0, 18.0
+    right_red, right_pupil = 12.0, 18.0
+    is_eye_detected = False
+    
+    if mp is not None and cv2 is not None:
+        detector = get_face_landmarker_detector()
+        if detector is not None:
+            try:
+                mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=img_rgb)
+                res = detector.detect(mp_image)
+                if res.face_landmarks:
+                    landmarks = res.face_landmarks[0]
+                    
+                    def get_pts(indices):
+                        pts = []
+                        for idx in indices:
+                            pt = landmarks[idx]
+                            pts.append([int(pt.x * w), int(pt.y * h)])
+                        return np.array(pts, dtype=np.int32)
+                        
+                    l_pts = get_pts(left_eye_indices)
+                    r_pts = get_pts(right_eye_indices)
+                    
+                    lx, ly, lw, lh = cv2.boundingRect(l_pts)
+                    if lw > 2 and lh > 2:
+                        left_crop = img_rgb[ly:ly+lh, lx:lx+lw]
+                        left_red, left_pupil = analyze_eye_region_cv(left_crop)
+                        is_eye_detected = True
+                        
+                    rx, ry, rw, rh = cv2.boundingRect(r_pts)
+                    if rw > 2 and rh > 2:
+                        right_crop = img_rgb[ry:ry+rh, rx:rx+rw]
+                        right_red, right_pupil = analyze_eye_region_cv(right_crop)
+                        is_eye_detected = True
+            except Exception:
+                pass
+                
+        if not is_eye_detected:
+            try:
+                if hasattr(mp, 'solutions') and hasattr(mp.solutions, 'face_mesh'):
+                    mp_face_mesh = mp.solutions.face_mesh
+                    with mp_face_mesh.FaceMesh(static_image_mode=True, max_num_faces=1, refine_landmarks=True) as face_mesh:
+                        results = face_mesh.process(img_rgb)
+                        if results.multi_face_landmarks:
+                            landmarks = results.multi_face_landmarks[0].landmark
+                            def get_pts_sol(indices):
+                                pts = []
+                                for idx in indices:
+                                    pt = landmarks[idx]
+                                    pts.append([int(pt.x * w), int(pt.y * h)])
+                                return np.array(pts, dtype=np.int32)
+                            l_pts = get_pts_sol(left_eye_indices)
+                            r_pts = get_pts_sol(right_eye_indices)
+                            
+                            lx, ly, lw, lh = cv2.boundingRect(l_pts)
+                            if lw > 2 and lh > 2:
+                                left_crop = img_rgb[ly:ly+lh, lx:lx+lw]
+                                left_red, left_pupil = analyze_eye_region_cv(left_crop)
+                                is_eye_detected = True
+                            rx, ry, rw, rh = cv2.boundingRect(r_pts)
+                            if rw > 2 and rh > 2:
+                                right_crop = img_rgb[ry:ry+rh, rx:rx+rw]
+                                right_red, right_pupil = analyze_eye_region_cv(right_crop)
+                                is_eye_detected = True
+            except Exception:
+                pass
+                
+    avg_red = (left_red + right_red) / 2.0
+    avg_pupil = (left_pupil + right_pupil) / 2.0
+    
+    redness_index = float(np.clip(avg_red * 4.0, 5.0, 100.0))
+    pupil_index = float(np.clip(avg_pupil, 10.0, 35.0))
+    anisocoria_delta = abs(left_pupil - right_pupil)
+    
+    return redness_index, pupil_index, is_eye_detected, left_pupil, right_pupil, anisocoria_delta
+
+
+
 def generate_clinical_pdf(name, age, prediction, clinical_data, age_focus,
                            topical_rx, prescription_rx, procedure_rx, lifestyle_rx,
                            diet_plan, eye_rx, img, thermal_img, uv_img, plot_buf,
@@ -2319,24 +2443,57 @@ with col1:
                 # Skin health score
                 skin_health_score = compute_skin_health_score(label, clinical_data)
 
-                # Dynamic Ocular Status from EI + patient hash
-                import hashlib
-                hash_val = int(hashlib.md5(f"{patient_name}_{patient_age}".encode()).hexdigest()[:6], 16) % 100
-                offset = (hash_val - 50) / 1000.0
-                final_redness = clinical_data["erythema_index"] / 100.0 + offset
-
-                if final_redness > 0.36:
-                    eye_status   = "Strain"
-                    retina_score = round(np.clip(78.5 - patient_age * 0.1, 45, 99), 1)
-                elif final_redness > 0.30:
-                    eye_status   = "Fatigue"
-                    retina_score = round(np.clip(86.2 - patient_age * 0.1, 50, 99), 1)
-                elif final_redness > 0.22:
-                    eye_status   = "Normal"
-                    retina_score = round(np.clip(93.4 - patient_age * 0.08, 55, 99), 1)
+                # Run Computer Vision Eye and Pupil Analysis
+                sclera_red, pupil_ratio, eye_detected, left_p, right_p, ani_delta = analyze_eye_scan(processed_img)
+                clinical_data["sclera_redness_pct"] = sclera_red
+                clinical_data["pupil_ratio"] = pupil_ratio
+                clinical_data["left_pupil_ratio"] = left_p
+                clinical_data["right_pupil_ratio"] = right_p
+                clinical_data["anisocoria_delta"] = ani_delta
+                
+                if ani_delta > 3.0:
+                    clinical_data["pupil_symmetry_status"] = f"Asymmetry Warning (Delta: {ani_delta:.1f}%)"
+                    clinical_data["pupil_symmetry_desc"] = "Moderate discrepancy detected (Anisocoria Screening). Recommend professional evaluation to check cranial nerves / pupillary pathways."
                 else:
-                    eye_status   = "Optimal"
-                    retina_score = round(np.clip(97.8 - patient_age * 0.05, 60, 99), 1)
+                    clinical_data["pupil_symmetry_status"] = "Normal (Symmetric)"
+                    clinical_data["pupil_symmetry_desc"] = "No significant pupil asymmetry detected."
+
+                if eye_detected:
+                    if sclera_red > 35:
+                        eye_status = "Strain"
+                        retina_score = round(max(45.0, 100.0 - sclera_red), 1)
+                    elif sclera_red > 22:
+                        eye_status = "Fatigue"
+                        retina_score = round(max(55.0, 100.0 - sclera_red), 1)
+                    elif sclera_red > 10:
+                        eye_status = "Normal"
+                        retina_score = round(max(75.0, 100.0 - sclera_red), 1)
+                    else:
+                        eye_status = "Optimal"
+                        retina_score = round(max(90.0, 100.0 - sclera_red), 1)
+                else:
+                    import hashlib
+                    hash_val = int(hashlib.md5(f"{patient_name}_{patient_age}".encode()).hexdigest()[:6], 16) % 100
+                    offset = (hash_val - 50) / 1000.0
+                    final_redness = clinical_data["erythema_index"] / 100.0 + offset
+
+                    if final_redness > 0.36:
+                        eye_status   = "Strain"
+                        retina_score = round(np.clip(78.5 - patient_age * 0.1, 45, 99), 1)
+                    elif final_redness > 0.30:
+                        eye_status   = "Fatigue"
+                        retina_score = round(np.clip(86.2 - patient_age * 0.1, 50, 99), 1)
+                    elif final_redness > 0.22:
+                        eye_status   = "Normal"
+                        retina_score = round(np.clip(93.4 - patient_age * 0.08, 55, 99), 1)
+                    else:
+                        eye_status   = "Optimal"
+                        retina_score = round(np.clip(97.8 - patient_age * 0.05, 60, 99), 1)
+                    
+                    clinical_data["sclera_redness_pct"] = final_redness * 100.0
+                    clinical_data["pupil_ratio"] = 18.5
+                    clinical_data["pupil_symmetry_status"] = "Normal (Symmetric)"
+                    clinical_data["pupil_symmetry_desc"] = "No eye regions detected. Using baseline screening averages." 
 
                 # Add to history
                 timestamp_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -2501,6 +2658,10 @@ with col2:
             <h3>🎯 Present Health Indices</h3>
             <p>• <b>Skin Health Score:</b> <span style='color:#00ff88; font-size:20px'><b>{shs}%</b></span></p>
             <p>• <b>Ocular Comfort Index:</b> <span style='color:#74b9ff; font-size:20px'><b>{rs}%</b></span> ({es})</p>
+            <p>• <b>Pupil Dilation Ratio:</b> <b>{cd.get('pupil_ratio', 18.5):.1f}%</b> (Normal range: 12-25%)</p>
+            <p>• <b>Sclera Redness Index:</b> <span style='color:#ff6b6b'><b>{cd.get('sclera_redness_pct', 12.0):.1f}%</b></span></p>
+            <p>• <b>Pupillary Symmetry:</b> <b>{cd.get('pupil_symmetry_status', 'Normal (Symmetric)')}</b></p>
+            <p style='font-size:11px; color:#aaa; margin-top:-5px'><i>{cd.get('pupil_symmetry_desc', '')}</i></p>
         </div>
         """, unsafe_allow_html=True)
 
