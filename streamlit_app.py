@@ -2676,7 +2676,7 @@ def generate_clinical_pdf(name, age, prediction, clinical_data, age_focus,
 
 def generate_simple_pdf(name, age, prediction, clinical_data, age_focus,
                         topical_rx, prescription_rx, procedure_rx, lifestyle_rx,
-                        diet_plan, eye_rx, plot_buf,
+                        diet_plan, eye_rx, img, plot_buf,
                         skin_health_score, eye_status, retina_score, theme="Clinical Lab Blue", lang="en"):
     
     # Sanitize all string inputs to prevent FPDF font encoding errors
@@ -2722,15 +2722,21 @@ def generate_simple_pdf(name, age, prediction, clinical_data, age_focus,
     is_high_risk = False
     is_med_risk = False
     
-    if skin_health_score < 55 or retina_score < 55:
+    # High Risk: Truly critical thresholds (score < 40) or severe clinical stages
+    if skin_health_score < 40 or retina_score < 40:
         is_high_risk = True
-    elif skin_health_score < 75 or retina_score < 75:
+    elif skin_health_score < 68 or retina_score < 68:
         is_med_risk = True
         
     eye_status_lower = eye_status.lower()
+    # High risk eye terms (severe cataracts, advanced DR, active glaucoma suspect)
     if any(x in eye_status_lower for x in ["severe", "stage 4", "stage 5", "glaucoma", "macular", "retinopathy"]):
         is_high_risk = True
-    elif any(x in eye_status_lower for x in ["mild", "moderate", "dry eye", "strain"]):
+    elif any(x in eye_status_lower for x in ["mild", "moderate", "dry eye", "strain", "fatigue"]):
+        is_med_risk = True
+        
+    # If primary prediction is a standard skin condition but health score is decent, keep it as moderate risk
+    if prediction in ["Acne", "Eczema", "Psoriasis"] and not is_high_risk:
         is_med_risk = True
         
     if is_high_risk:
@@ -2745,6 +2751,24 @@ def generate_simple_pdf(name, age, prediction, clinical_data, age_focus,
         risk_level = "LOW RISK"
         risk_color = (40, 167, 69) # Green
         risk_desc = "Excellent health markers! Keep maintaining your current balanced skincare routine and healthy habits."
+
+    # Fruit Prescription based on condition
+    pred_lower = prediction.lower()
+    if "acne" in pred_lower:
+        fruit_title = "Citrus Fruits (Oranges, Lemons), Papaya, & Mixed Berries"
+        fruit_desc = "Citrus fruits and papaya are rich in Vitamin C and Vitamin A which reduce oiliness, support natural skin clearing, and reduce acne inflammation. Berries offer strong antioxidants to speed up skin healing and clear pigmentation spots."
+    elif "eczema" in pred_lower:
+        fruit_title = "Avocado, Bananas, & Watermelon"
+        fruit_desc = "Avocados provide healthy monounsaturated fats that naturally moisturize dry, sensitive skin barriers from within. Bananas and watermelon deliver rich potassium and high hydration levels to soothe itchy, red patches."
+    elif "psoriasis" in pred_lower:
+        fruit_title = "Blueberries, Red Grapes, & Strawberries"
+        fruit_desc = "These deep-colored fruits contain high levels of anti-inflammatory compounds like resveratrol and quercetin. They actively soothe red, scaling skin plaques and encourage healthy cellular regeneration."
+    elif "wrinkles" in pred_lower:
+        fruit_title = "Pomegranate, Blackberries, & Avocado"
+        fruit_desc = "Pomegranates help block enzymes that break down collagen, black/blueberries fight aging free-radicals, and avocados supply rich Vitamin E to maintain skin firmness, smoothness, and elasticity."
+    else: # Healthy Skin
+        fruit_title = "Strawberries, Apples, & Oranges"
+        fruit_desc = "A daily variety of antioxidant-rich fruits supports ongoing collagen synthesis, keeps skin hydrated, protects against UV cell damage, and maintains a healthy, vibrant, and glowing complexion."
 
     # PAGE 1: Welcome & Summary
     pdf.add_page()
@@ -2767,24 +2791,45 @@ def generate_simple_pdf(name, age, prediction, clinical_data, age_focus,
     pdf.cell(0, 8, "VISION-AI | MY HEALTH & WELLNESS SUMMARY", align='C', ln=1)
     pdf.ln(10)
     
-    # Patient Info Box
+    # Patient Info Box & Profile Image (side-by-side)
     pdf.set_fill_color(*bg_card)
-    pdf.rect(10, 30, 190, 22, 'F')
+    pdf.rect(10, 30, 132, 25, 'F')
     pdf.set_xy(12, 32)
     pdf.set_text_color(*text_color)
-    pdf.set_font("Helvetica", 'B', 10)
-    pdf.cell(90, 5, f"PATIENT NAME: {name.upper()}", ln=0)
-    pdf.cell(90, 5, f"DATE GENERATED: {datetime.datetime.now().strftime('%Y-%m-%d')}", ln=1)
+    pdf.set_font("Helvetica", 'B', 9.5)
+    pdf.cell(0, 5, f"PATIENT NAME: {name.upper()}", ln=1)
     pdf.set_xy(12, 37)
-    pdf.cell(90, 5, f"PATIENT AGE: {age} Years", ln=0)
-    pdf.cell(90, 5, f"REPORT TYPE: Simple Patient-Friendly Format", ln=1)
+    pdf.cell(0, 5, f"PATIENT AGE: {age} Years", ln=1)
     pdf.set_xy(12, 42)
-    pdf.set_font("Helvetica", 'I', 8)
-    pdf.cell(0, 5, "This report translates complex clinical biometrics into clear, simple, and actionable health guidance.", ln=1)
-    pdf.ln(10)
+    pdf.cell(0, 5, f"DATE: {datetime.datetime.now().strftime('%Y-%m-%d')}", ln=1)
+    pdf.set_xy(12, 47)
+    pdf.set_font("Helvetica", 'I', 7.5)
+    pdf.cell(0, 5, "Translating clinical biometrics into simple, actionable health guidance.", ln=1)
     
+    # Embed Patient Image
+    import uuid
+    unique_id = uuid.uuid4().hex
+    temp_profile_path = f"temp_simple_profile_{unique_id}.jpg"
+    temp_plot_path = f"temp_simple_plot_{unique_id}.png"
+    
+    try:
+        # Resize/convert to RGB and save as JPG
+        img_profile = img.convert("RGB")
+        img_profile.save(temp_profile_path, format="JPEG", quality=90)
+        # Draw frame
+        pdf.set_draw_color(*border_color)
+        pdf.rect(150, 30, 50, 42)
+        # Place image inside frame
+        pdf.image(temp_profile_path, x=151, y=31, w=48, h=40)
+    except Exception as e:
+        pdf.set_draw_color(*border_color)
+        pdf.rect(150, 30, 50, 42)
+        pdf.set_xy(151, 48)
+        pdf.set_font("Helvetica", 'I', 7.5)
+        pdf.cell(48, 5, "[Profile Scan Image N/A]", align='C')
+        
     # Section 1: Risk Assessment
-    pdf.set_y(58)
+    pdf.set_y(60)
     pdf.set_fill_color(*title_color)
     pdf.set_text_color(255, 255, 255)
     pdf.set_font("Helvetica", 'B', 11)
@@ -2793,13 +2838,13 @@ def generate_simple_pdf(name, age, prediction, clinical_data, age_focus,
     
     # Risk Card
     pdf.set_fill_color(*bg_card)
-    pdf.rect(10, 68, 190, 25, 'F')
-    pdf.set_xy(15, 71)
+    pdf.rect(10, 70, 190, 25, 'F')
+    pdf.set_xy(15, 73)
     pdf.set_text_color(*risk_color)
     pdf.set_font("Helvetica", 'B', 16)
     pdf.cell(0, 7, f"STATUS: {risk_level}", ln=1)
     
-    pdf.set_xy(15, 78)
+    pdf.set_xy(15, 80)
     pdf.set_text_color(*text_color)
     pdf.set_font("Helvetica", '', 10)
     pdf.multi_cell(180, 5, risk_desc)
@@ -2825,7 +2870,6 @@ def generate_simple_pdf(name, age, prediction, clinical_data, age_focus,
     pdf.set_text_color(*text_color)
     pdf.set_font("Helvetica", '', 9.5)
     
-    pred_lower = prediction.lower()
     if "acne" in pred_lower:
         skin_explain = "Our scan indicates signs of Acne. This occurs when oil and dead skin cells clog your pores, sometimes causing redness or swelling. Focus on keeping your face clean, avoiding harsh scrubs, and using oil-free moisturizers."
     elif "eczema" in pred_lower:
@@ -2901,12 +2945,11 @@ def generate_simple_pdf(name, age, prediction, clinical_data, age_focus,
     pdf.ln(2)
     
     pdf.set_fill_color(*bg_card)
-    pdf.rect(10, 25, 190, 40, 'F')
-    pdf.set_xy(15, 28)
+    pdf.rect(10, 25, 190, 26, 'F')
+    pdf.set_xy(15, 27)
     pdf.set_text_color(*text_color)
     pdf.set_font("Helvetica", '', 9)
     
-    # Process diet plan cleanly
     lines = diet_plan.split('\n')
     clean_diet_lines = []
     for line in lines:
@@ -2915,69 +2958,75 @@ def generate_simple_pdf(name, age, prediction, clinical_data, age_focus,
             clean_diet_lines.append(cleaned)
             
     diet_text = ""
-    for idx, dl in enumerate(clean_diet_lines[:6]):
+    for idx, dl in enumerate(clean_diet_lines[:4]):
         diet_text += f"- {dl}\n"
     if not diet_text:
-        diet_text = "- Eat a balanced diet rich in antioxidants, berries, and green leafy vegetables.\n- Keep your body hydrated by drinking 8-10 glasses of water daily.\n- Limit highly processed sugary foods which can trigger skin inflammation."
+        diet_text = "- Eat a balanced diet rich in antioxidants, berries, and green leafy vegetables.\n- Keep your body hydrated by drinking 8-10 glasses of water daily."
         
-    pdf.multi_cell(180, 4.5, diet_text.strip())
-    pdf.ln(10)
+    pdf.multi_cell(180, 4.3, diet_text.strip())
     
-    # Section 5: Recommended Routine & Care
-    pdf.set_y(72)
+    # Section 5: Fruit Prescription Card
+    pdf.set_y(56)
     pdf.set_fill_color(*title_color)
     pdf.set_text_color(255, 255, 255)
     pdf.set_font("Helvetica", 'B', 11)
-    pdf.cell(0, 8, "  5. DAILY CARE & SKINCARE ROUTINE", ln=1, fill=True)
+    pdf.cell(0, 8, "  5. MY FRUIT VITALITY PRESCRIPTION (Skin & Eye Health)", ln=1, fill=True)
     pdf.ln(2)
     
     pdf.set_fill_color(*bg_card)
-    pdf.rect(10, 82, 190, 50, 'F')
-    pdf.set_xy(15, 85)
+    pdf.rect(10, 66, 190, 24, 'F')
+    pdf.set_xy(15, 68)
+    pdf.set_font("Helvetica", 'B', 9)
+    pdf.set_text_color(*accent_color)
+    pdf.cell(0, 5, f"Prescribed Fruits: {fruit_title}", ln=1)
+    pdf.set_text_color(*text_color)
+    pdf.set_font("Helvetica", '', 8.5)
+    pdf.set_xy(15, 73)
+    pdf.multi_cell(180, 4.1, fruit_desc)
+    
+    # Section 6: Skincare Routine
+    pdf.set_y(95)
+    pdf.set_fill_color(*title_color)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("Helvetica", 'B', 11)
+    pdf.cell(0, 8, "  6. DAILY CARE & SKINCARE ROUTINE", ln=1, fill=True)
+    pdf.ln(2)
+    
+    pdf.set_fill_color(*bg_card)
+    pdf.rect(10, 105, 190, 36, 'F')
+    pdf.set_xy(15, 107)
     pdf.set_text_color(*text_color)
     pdf.set_font("Helvetica", '', 9)
     
     topical_first = topical_rx.split('\n')[0] if topical_rx else 'Hydrating barrier creams'
     lifestyle_first = lifestyle_rx.split('\n')[0] if lifestyle_rx else 'Protect eyes from screens, sleep 8 hours.'
     
-    routine_text = f"AGE FOCUS PLAN: {age_focus}\n\n"
-    routine_text += f"DAILY CARE TIPS:\n"
-    routine_text += f"1. Morning Care: Apply a gentle moisturizer and broad-spectrum sunscreen (SPF 30 or higher) every single morning to prevent UV damage.\n"
-    routine_text += f"2. Evening Care: Wash your face thoroughly to remove dirt and sunscreen. Apply recommended active treatments or barrier repair creams.\n"
-    routine_text += f"3. Active Treatment focus: {topical_first}\n"
+    routine_text = f"AGE FOCUS PLAN: {age_focus}\n"
+    routine_text += f"1. Morning Care: Apply moisturizer and sunscreen (SPF 30+) daily.\n"
+    routine_text += f"2. Evening Care: Double cleanse, apply active treatments or barrier creams.\n"
+    routine_text += f"3. Primary Active: {topical_first}\n"
     routine_text += f"4. Lifestyle Guidance: {lifestyle_first}"
     
-    pdf.multi_cell(180, 4.3, routine_text)
-    pdf.ln(10)
+    pdf.multi_cell(180, 4.2, routine_text)
     
-    # Section 6: 10-Year Health Projection Graph
-    pdf.set_y(138)
+    # Section 7: 10-Year Health Projection Graph
+    pdf.set_y(146)
     pdf.set_fill_color(*title_color)
     pdf.set_text_color(255, 255, 255)
     pdf.set_font("Helvetica", 'B', 11)
-    pdf.cell(0, 8, "  6. MY 10-YEAR HEALTH PROJECTION GRAPH", ln=1, fill=True)
+    pdf.cell(0, 8, "  7. MY 10-YEAR HEALTH PROJECTION GRAPH", ln=1, fill=True)
     pdf.ln(2)
     
-    # Draw the plot image
-    import uuid
-    unique_id = uuid.uuid4().hex
-    temp_plot_path = f"temp_simple_plot_{unique_id}.png"
     try:
         with open(temp_plot_path, "wb") as f:
             f.write(plot_buf.getvalue())
-        pdf.image(temp_plot_path, x=35, y=148, w=140, h=85)
+        pdf.image(temp_plot_path, x=35, y=156, w=140, h=78)
     except Exception as e:
-        pdf.set_xy(15, 150)
+        pdf.set_xy(15, 165)
         pdf.set_font("Helvetica", 'I', 10)
         pdf.cell(0, 10, f"[Projection Graph Unavailable: {str(e)}]", ln=1)
-    finally:
-        try:
-            if os.path.exists(temp_plot_path):
-                os.remove(temp_plot_path)
-        except Exception:
-            pass
             
-    # Section 7: Wellness Disclaimer Notice
+    # Section 8: Wellness Disclaimer Notice
     pdf.set_xy(10, 240)
     pdf.set_fill_color(*bg_card)
     pdf.rect(10, 240, 190, 26, 'F')
@@ -2999,12 +3048,22 @@ def generate_simple_pdf(name, age, prediction, clinical_data, age_focus,
     pdf.cell(0, 5, "HEALTHY LIFE, HAPPY MIND", ln=1, align='R')
     
     try:
-        return pdf.output()
+        out = pdf.output()
+        if isinstance(out, str):
+            return out.encode('latin-1')
+        return bytes(out)
     except Exception:
         try:
-            return bytes(pdf.output(dest='S'), 'latin-1')
+            return bytes(pdf.output(), 'latin-1')
         except Exception:
-            return pdf.output(dest='S')
+            return bytes(pdf.output())
+    finally:
+        for p in [temp_profile_path, temp_plot_path]:
+            try:
+                if os.path.exists(p):
+                    os.remove(p)
+            except Exception:
+                pass
 
 
 # ============================================================
@@ -3915,7 +3974,7 @@ with col2:
                 clinical_data=cd, age_focus=age_focus,
                 topical_rx=topical_rx, prescription_rx=prescription_rx,
                 procedure_rx=procedure_rx, lifestyle_rx=lifestyle_rx,
-                diet_plan=dynamic_diet, eye_rx=eye_rx_data,
+                diet_plan=dynamic_diet, eye_rx=eye_rx_data, img=img,
                 plot_buf=pdf_plot_buf,
                 skin_health_score=shs, eye_status=es, retina_score=rs,
                 theme=pdf_theme, lang=lang_code
