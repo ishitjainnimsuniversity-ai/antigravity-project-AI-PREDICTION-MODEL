@@ -2937,12 +2937,15 @@ def generate_simple_pdf(name, age, prediction, clinical_data, age_focus,
     pdf.set_text_color(*text_color)
     pdf.set_font("Helvetica", '', 9)
     
+    topical_first = topical_rx.split('\n')[0] if topical_rx else 'Hydrating barrier creams'
+    lifestyle_first = lifestyle_rx.split('\n')[0] if lifestyle_rx else 'Protect eyes from screens, sleep 8 hours.'
+    
     routine_text = f"AGE FOCUS PLAN: {age_focus}\n\n"
     routine_text += f"DAILY CARE TIPS:\n"
     routine_text += f"1. Morning Care: Apply a gentle moisturizer and broad-spectrum sunscreen (SPF 30 or higher) every single morning to prevent UV damage.\n"
     routine_text += f"2. Evening Care: Wash your face thoroughly to remove dirt and sunscreen. Apply recommended active treatments or barrier repair creams.\n"
-    routine_text += f"3. Active Treatment focus: {topical_rx.split('\n')[0] if topical_rx else 'Hydrating barrier creams'}\n"
-    routine_text += f"4. Lifestyle Guidance: {lifestyle_rx.split('\n')[0] if lifestyle_rx else 'Protect eyes from screens, sleep 8 hours.'}"
+    routine_text += f"3. Active Treatment focus: {topical_first}\n"
+    routine_text += f"4. Lifestyle Guidance: {lifestyle_first}"
     
     pdf.multi_cell(180, 4.3, routine_text)
     pdf.ln(10)
