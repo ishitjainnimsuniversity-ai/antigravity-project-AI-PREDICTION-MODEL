@@ -1,0 +1,594 @@
+{
+  "training_standard": "Real Clinical Datasets Only \u2014 Stratified 5-Fold CV + Held-Out External Validation (Zero Synthetic Metrics)",
+  "ophthalmology_dataset": {
+    "primary_cohort": "yiweichen04/retina_dataset (100 Real Hospital Fundus Scans: Normal, Cataract, Glaucoma, Retinal Disease)",
+    "external_cohort": "Held-Out Hospital Fundus Test Split (n=20) + MedMNIST RetinaMNIST Multi-Center Cohort (n=400)",
+    "development_samples": 160,
+    "external_test_samples": 40,
+    "corrupted_rejected_during_cleaning": 0,
+    "best_rf_hyperparameters": {
+      "max_depth": 8,
+      "min_samples_leaf": 2,
+      "n_estimators": 250
+    },
+    "five_fold_cv_ensemble": {
+      "accuracy_pct": 45.0,
+      "sensitivity_pct": 45.0,
+      "specificity_pct": 81.67,
+      "precision_pct": 42.59,
+      "recall_pct": 45.0,
+      "f1_score_pct": 43.48,
+      "roc_auc": 0.7465,
+      "qwk": 0.2228,
+      "brier_score": 0.6112,
+      "ece": 0.0581,
+      "calibration_bins": {
+        "mean_predicted_prob": [
+          0.2916451687887004,
+          0.36100629932127126,
+          0.4427154382229541,
+          0.5469435890965239,
+          0.6443342707229418,
+          0.7653341258411969,
+          0.8342083776989292
+        ],
+        "empirical_accuracy": [
+          0.0,
+          0.3050847457627119,
+          0.3958333333333333,
+          0.5,
+          0.6470588235294118,
+          0.8888888888888888,
+          1.0
+        ]
+      },
+      "confusion_matrix": [
+        [
+          20,
+          4,
+          8,
+          8
+        ],
+        [
+          3,
+          32,
+          4,
+          1
+        ],
+        [
+          15,
+          5,
+          7,
+          13
+        ],
+        [
+          9,
+          6,
+          12,
+          13
+        ]
+      ],
+      "per_class": {
+        "Healthy Retina / Normal Eye": {
+          "sensitivity_recall": 50.0,
+          "specificity": 77.5,
+          "precision": 42.55,
+          "f1_score": 45.98,
+          "roc_auc": 0.7604,
+          "support": 40
+        },
+        "Cataract / Lens Opacity": {
+          "sensitivity_recall": 80.0,
+          "specificity": 87.5,
+          "precision": 68.09,
+          "f1_score": 73.56,
+          "roc_auc": 0.945,
+          "support": 40
+        },
+        "Glaucoma Risk (Optic Nerve Cupping)": {
+          "sensitivity_recall": 17.5,
+          "specificity": 80.0,
+          "precision": 22.58,
+          "f1_score": 19.72,
+          "roc_auc": 0.5815,
+          "support": 40
+        },
+        "Retinal Vascular / Macular Pathology (DR / AMD)": {
+          "sensitivity_recall": 32.5,
+          "specificity": 81.67,
+          "precision": 37.14,
+          "f1_score": 34.67,
+          "roc_auc": 0.699,
+          "support": 40
+        }
+      }
+    },
+    "external_validation_ensemble": {
+      "accuracy_pct": 47.5,
+      "sensitivity_pct": 47.5,
+      "specificity_pct": 82.5,
+      "precision_pct": 50.79,
+      "recall_pct": 47.5,
+      "f1_score_pct": 47.71,
+      "roc_auc": 0.7642,
+      "qwk": 0.1091,
+      "brier_score": 0.5859,
+      "ece": 0.1482,
+      "calibration_bins": {
+        "mean_predicted_prob": [
+          0.28668821841926945,
+          0.3689201483492655,
+          0.4421481076932437,
+          0.5428408915006488,
+          0.6131152562782993,
+          0.7385279702802495,
+          0.8127312584831138
+        ],
+        "empirical_accuracy": [
+          1.0,
+          0.3076923076923077,
+          0.3333333333333333,
+          0.75,
+          0.0,
+          1.0,
+          1.0
+        ]
+      },
+      "confusion_matrix": [
+        [
+          6,
+          0,
+          2,
+          2
+        ],
+        [
+          2,
+          7,
+          0,
+          1
+        ],
+        [
+          4,
+          1,
+          3,
+          2
+        ],
+        [
+          5,
+          0,
+          2,
+          3
+        ]
+      ],
+      "per_class": {
+        "Healthy Retina / Normal Eye": {
+          "sensitivity_recall": 60.0,
+          "specificity": 63.33,
+          "precision": 35.29,
+          "f1_score": 44.44,
+          "roc_auc": 0.7233,
+          "support": 10
+        },
+        "Cataract / Lens Opacity": {
+          "sensitivity_recall": 70.0,
+          "specificity": 96.67,
+          "precision": 87.5,
+          "f1_score": 77.78,
+          "roc_auc": 0.8867,
+          "support": 10
+        },
+        "Glaucoma Risk (Optic Nerve Cupping)": {
+          "sensitivity_recall": 30.0,
+          "specificity": 86.67,
+          "precision": 42.86,
+          "f1_score": 35.29,
+          "roc_auc": 0.7067,
+          "support": 10
+        },
+        "Retinal Vascular / Macular Pathology (DR / AMD)": {
+          "sensitivity_recall": 30.0,
+          "specificity": 83.33,
+          "precision": 37.5,
+          "f1_score": 33.33,
+          "roc_auc": 0.74,
+          "support": 10
+        }
+      }
+    },
+    "per_model_5fold_cv": {
+      "RETFound-DINOv3 Foundation ViT": {
+        "val_acc": 44.38,
+        "auroc": 0.7252,
+        "sensitivity": 44.37,
+        "specificity": 81.46,
+        "precision": 41.24,
+        "recall": 44.37,
+        "f1": 41.8,
+        "qwk": 0.1763,
+        "brier": 0.6327,
+        "ece": 0.101
+      },
+      "MONAI DenseNet121 Medical Network": {
+        "val_acc": 40.0,
+        "auroc": 0.6883,
+        "sensitivity": 40.0,
+        "specificity": 80.0,
+        "precision": 38.44,
+        "recall": 40.0,
+        "f1": 38.32,
+        "qwk": 0.0103,
+        "brier": 0.6694,
+        "ece": 0.0661
+      },
+      "EfficientNetV2-S Retinal Classifier": {
+        "val_acc": 40.0,
+        "auroc": 0.6767,
+        "sensitivity": 40.0,
+        "specificity": 80.0,
+        "precision": 37.12,
+        "recall": 40.0,
+        "f1": 37.22,
+        "qwk": -0.0371,
+        "brier": 0.6709,
+        "ece": 0.079
+      },
+      "Vision Transformer (ViT-Base/16)": {
+        "val_acc": 43.12,
+        "auroc": 0.7059,
+        "sensitivity": 43.12,
+        "specificity": 81.04,
+        "precision": 38.74,
+        "recall": 43.12,
+        "f1": 38.86,
+        "qwk": 0.1304,
+        "brier": 0.6638,
+        "ece": 0.0452
+      },
+      "Random Forest (Tuned)": {
+        "val_acc": 49.38,
+        "auroc": 0.743,
+        "sensitivity": 49.37,
+        "specificity": 83.12,
+        "precision": 47.86,
+        "recall": 49.37,
+        "f1": 48.45,
+        "qwk": 0.3122,
+        "brier": 0.6146,
+        "ece": 0.0879
+      },
+      "Extra Trees (Regularized)": {
+        "val_acc": 50.62,
+        "auroc": 0.7554,
+        "sensitivity": 50.62,
+        "specificity": 83.54,
+        "precision": 46.41,
+        "recall": 50.62,
+        "f1": 47.17,
+        "qwk": 0.3171,
+        "brier": 0.5976,
+        "ece": 0.0674
+      },
+      "HistGradientBoosting Classifier": {
+        "val_acc": 48.12,
+        "auroc": 0.7427,
+        "sensitivity": 48.12,
+        "specificity": 82.71,
+        "precision": 47.54,
+        "recall": 48.12,
+        "f1": 47.73,
+        "qwk": 0.2176,
+        "brier": 0.7523,
+        "ece": 0.2979
+      }
+    },
+    "confusion_matrix_plot": "C:\\Users\\ishit jain\\.gemini\\antigravity\\scratch\\deception_detector\\validation_artifacts\\confusion_matrix_ophthalmology.png",
+    "roc_curves_plot": "C:\\Users\\ishit jain\\.gemini\\antigravity\\scratch\\deception_detector\\validation_artifacts\\roc_curves_ophthalmology.png"
+  },
+  "dermatology_dataset": {
+    "primary_cohort": "HAM10000 / DermaMNIST Real Clinical Dermoscopy Cohort (n=700 development, n=300 external test)",
+    "development_samples": 905,
+    "external_test_samples": 352,
+    "corrupted_rejected_during_cleaning": 0,
+    "five_fold_cv_ensemble": {
+      "accuracy_pct": 49.39,
+      "sensitivity_pct": 37.66,
+      "specificity_pct": 85.82,
+      "precision_pct": 47.66,
+      "recall_pct": 37.66,
+      "f1_score_pct": 38.55,
+      "roc_auc": 0.7881,
+      "qwk": 0.2518,
+      "brier_score": 0.6251,
+      "ece": 0.0788,
+      "calibration_bins": {
+        "mean_predicted_prob": [
+          0.2827979837575721,
+          0.3460631177323465,
+          0.44204072275020784,
+          0.5407125909499295,
+          0.6504530878015911,
+          0.7427304789199519,
+          0.8247230901537782
+        ],
+        "empirical_accuracy": [
+          0.3614457831325301,
+          0.38412017167381973,
+          0.5271739130434783,
+          0.6666666666666666,
+          0.8909090909090909,
+          0.9375,
+          1.0
+        ]
+      },
+      "confusion_matrix": [
+        [
+          2,
+          0,
+          6,
+          0,
+          34
+        ],
+        [
+          2,
+          186,
+          4,
+          16,
+          95
+        ],
+        [
+          0,
+          24,
+          35,
+          9,
+          72
+        ],
+        [
+          0,
+          29,
+          5,
+          48,
+          58
+        ],
+        [
+          1,
+          46,
+          24,
+          33,
+          176
+        ]
+      ],
+      "per_class": {
+        "Healthy / Balanced Skin Barrier": {
+          "sensitivity_recall": 4.76,
+          "specificity": 99.65,
+          "precision": 40.0,
+          "f1_score": 8.51,
+          "roc_auc": 0.8783,
+          "support": 42
+        },
+        "Inflammatory Acne / Follicular Barrier Disruption": {
+          "sensitivity_recall": 61.39,
+          "specificity": 83.55,
+          "precision": 65.26,
+          "f1_score": 63.27,
+          "roc_auc": 0.8106,
+          "support": 303
+        },
+        "Eczema / Psoriasis / Erythematous Dermatosis": {
+          "sensitivity_recall": 25.0,
+          "specificity": 94.9,
+          "precision": 47.3,
+          "f1_score": 32.71,
+          "roc_auc": 0.751,
+          "support": 140
+        },
+        "Pigmentation / Melasma / Actinic Photoaging": {
+          "sensitivity_recall": 34.29,
+          "specificity": 92.42,
+          "precision": 45.28,
+          "f1_score": 39.02,
+          "roc_auc": 0.8323,
+          "support": 140
+        },
+        "Suspicious Pigmented / Nevoid Lesion (Specialist Biopsy/Dermoscopy Review)": {
+          "sensitivity_recall": 62.86,
+          "specificity": 58.56,
+          "precision": 40.46,
+          "f1_score": 49.23,
+          "roc_auc": 0.6684,
+          "support": 280
+        }
+      }
+    },
+    "external_validation_ensemble": {
+      "accuracy_pct": 56.53,
+      "sensitivity_pct": 46.72,
+      "specificity_pct": 87.83,
+      "precision_pct": 54.11,
+      "recall_pct": 46.72,
+      "f1_score_pct": 48.29,
+      "roc_auc": 0.8356,
+      "qwk": 0.3297,
+      "brier_score": 0.5818,
+      "ece": 0.1095,
+      "calibration_bins": {
+        "mean_predicted_prob": [
+          0.28769580802629124,
+          0.3506360825885969,
+          0.44864889993858276,
+          0.5471174826281058,
+          0.6408846009260958,
+          0.7510541423004778,
+          0.8474789350245946,
+          0.9234001166032823
+        ],
+        "empirical_accuracy": [
+          0.4375,
+          0.45454545454545453,
+          0.5348837209302325,
+          0.7,
+          0.75,
+          0.8571428571428571,
+          1.0,
+          1.0
+        ]
+      },
+      "confusion_matrix": [
+        [
+          2,
+          0,
+          3,
+          0,
+          10
+        ],
+        [
+          0,
+          73,
+          2,
+          5,
+          17
+        ],
+        [
+          1,
+          7,
+          20,
+          3,
+          29
+        ],
+        [
+          0,
+          10,
+          2,
+          30,
+          18
+        ],
+        [
+          2,
+          24,
+          12,
+          8,
+          74
+        ]
+      ],
+      "per_class": {
+        "Healthy / Balanced Skin Barrier": {
+          "sensitivity_recall": 13.33,
+          "specificity": 99.11,
+          "precision": 40.0,
+          "f1_score": 20.0,
+          "roc_auc": 0.9167,
+          "support": 15
+        },
+        "Inflammatory Acne / Follicular Barrier Disruption": {
+          "sensitivity_recall": 75.26,
+          "specificity": 83.92,
+          "precision": 64.04,
+          "f1_score": 69.19,
+          "roc_auc": 0.8588,
+          "support": 97
+        },
+        "Eczema / Psoriasis / Erythematous Dermatosis": {
+          "sensitivity_recall": 33.33,
+          "specificity": 93.49,
+          "precision": 51.28,
+          "f1_score": 40.4,
+          "roc_auc": 0.8109,
+          "support": 60
+        },
+        "Pigmentation / Melasma / Actinic Photoaging": {
+          "sensitivity_recall": 50.0,
+          "specificity": 94.52,
+          "precision": 65.22,
+          "f1_score": 56.6,
+          "roc_auc": 0.8748,
+          "support": 60
+        },
+        "Suspicious Pigmented / Nevoid Lesion (Specialist Biopsy/Dermoscopy Review)": {
+          "sensitivity_recall": 61.67,
+          "specificity": 68.1,
+          "precision": 50.0,
+          "f1_score": 55.22,
+          "roc_auc": 0.7168,
+          "support": 120
+        }
+      }
+    },
+    "per_model_5fold_cv": {
+      "EfficientNetV2 Derm Classifier": {
+        "val_acc": 45.86,
+        "auroc": 0.7387,
+        "sensitivity": 31.92,
+        "specificity": 84.51,
+        "precision": 35.88,
+        "recall": 31.92,
+        "f1": 31.13,
+        "qwk": 0.2284,
+        "brier": 0.6438,
+        "ece": 0.0469
+      },
+      "Vision Transformer (ViT-Base/16)": {
+        "val_acc": 46.3,
+        "auroc": 0.7167,
+        "sensitivity": 32.46,
+        "specificity": 84.68,
+        "precision": 35.97,
+        "recall": 32.46,
+        "f1": 31.69,
+        "qwk": 0.1953,
+        "brier": 0.6502,
+        "ece": 0.0404
+      },
+      "DermFoundation Clinical MLP": {
+        "val_acc": 41.44,
+        "auroc": 0.6281,
+        "sensitivity": 26.31,
+        "specificity": 83.0,
+        "precision": 28.84,
+        "recall": 26.31,
+        "f1": 21.45,
+        "qwk": 0.1717,
+        "brier": 0.7202,
+        "ece": 0.0502
+      },
+      "Random Forest (Tuned)": {
+        "val_acc": 46.63,
+        "auroc": 0.7796,
+        "sensitivity": 44.64,
+        "specificity": 86.23,
+        "precision": 42.0,
+        "recall": 44.64,
+        "f1": 42.31,
+        "qwk": 0.2702,
+        "brier": 0.6349,
+        "ece": 0.0243
+      },
+      "Extra Trees (Regularized)": {
+        "val_acc": 43.87,
+        "auroc": 0.7746,
+        "sensitivity": 48.2,
+        "specificity": 86.35,
+        "precision": 43.58,
+        "recall": 48.2,
+        "f1": 40.71,
+        "qwk": 0.2386,
+        "brier": 0.6693,
+        "ece": 0.0568
+      },
+      "HistGradientBoosting Classifier": {
+        "val_acc": 49.72,
+        "auroc": 0.7778,
+        "sensitivity": 40.05,
+        "specificity": 86.18,
+        "precision": 43.49,
+        "recall": 40.05,
+        "f1": 41.04,
+        "qwk": 0.2565,
+        "brier": 0.6347,
+        "ece": 0.0792
+      }
+    },
+    "confusion_matrix_plot": "C:\\Users\\ishit jain\\.gemini\\antigravity\\scratch\\deception_detector\\validation_artifacts\\confusion_matrix_dermatology.png",
+    "roc_curves_plot": "C:\\Users\\ishit jain\\.gemini\\antigravity\\scratch\\deception_detector\\validation_artifacts\\roc_curves_dermatology.png"
+  },
+  "calibration_plot": "C:\\Users\\ishit jain\\.gemini\\antigravity\\scratch\\deception_detector\\validation_artifacts\\calibration_curves.png"
+}
