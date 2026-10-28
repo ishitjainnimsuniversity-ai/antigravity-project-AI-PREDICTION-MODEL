@@ -1443,11 +1443,14 @@ def quantify_uncertainty_and_risk(model_probs_list, qa_score=85.0):
         "top_idx": top_idx,
         "top_conf_pct": top_conf_pct,
         "ci_95": [ci_low, ci_high],
+        "confidence_interval_95": [ci_low, ci_high],
         "entropy_pct": entropy_pct,
+        "normalized_entropy_pct": entropy_pct,
         "disagreement_pct": disagreement_pct,
         "is_uncertain": is_uncertain,
         "risk_level": risk_level,
         "uncertainty_banner": uncertainty_banner,
+        "uncertainty_flag": uncertainty_banner,
         "per_class_ci": per_class_ci
     }
 
