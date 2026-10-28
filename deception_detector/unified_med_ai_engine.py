@@ -509,7 +509,7 @@ def save_validation_plots(y_true, y_prob, class_names, prefix, title_label):
         yticks=np.arange(n_classes),
         xticklabels=short_names,
         yticklabels=short_names,
-        title=f"{title_label} — Real Validation Confusion Matrix",
+        title=f"{title_label} - Real Validation Confusion Matrix",
         ylabel="True Clinical Reference Label",
         xlabel="Predicted Model Class"
     )
@@ -545,7 +545,7 @@ def save_validation_plots(y_true, y_prob, class_names, prefix, title_label):
     ax_roc.set_ylim([0.0, 1.05])
     ax_roc.set_xlabel("1 - Specificity (False Positive Rate)")
     ax_roc.set_ylabel("Sensitivity (True Positive Rate)")
-    ax_roc.set_title(f"{title_label} — Real Validation ROC Curves")
+    ax_roc.set_title(f"{title_label} - Real Validation ROC Curves")
     ax_roc.legend(loc="lower right", fontsize=8.0)
     ax_roc.grid(True, alpha=0.25)
     fig_roc.tight_layout()
@@ -645,7 +645,7 @@ def assess_image_quality(img_bgr):
     snr_score = float(np.clip((snr_db / 28.0) * 100.0, 55.0, 98.2))
 
     overall = round(0.45 * focus_score + 0.30 * illum_score + 0.25 * snr_score, 1)
-    grade = "Diagnostic Grade A (RetiEval Pass)" if overall >= 75 else ("Grade B (Acceptable)" if overall >= 58 else "Grade C (Suboptimal Lighting — Re-capture Advised)")
+    grade = "Diagnostic Grade A (RetiEval Pass)" if overall >= 75 else ("Grade B (Acceptable)" if overall >= 58 else "Grade C (Suboptimal Lighting - Re-capture Advised)")
 
     return {
         "score": overall,
@@ -1301,7 +1301,7 @@ def build_or_load_unified_suite(force_retrain=False):
     _ = get_tensorrt_onnx_session()
 
     validation_report = {
-        "training_standard": "Real Clinical Datasets Only — Stratified 5-Fold CV + Held-Out External Validation (Zero Synthetic Metrics)",
+        "training_standard": "Real Clinical Datasets Only - Stratified 5-Fold CV + Held-Out External Validation (Zero Synthetic Metrics)",
         "ophthalmology_dataset": {
             "primary_cohort": "yiweichen04/retina_dataset (100 Real Hospital Fundus Scans: Normal, Cataract, Glaucoma, Retinal Disease)",
             "external_cohort": "Held-Out Hospital Fundus Test Split (n=20) + MedMNIST RetinaMNIST Multi-Center Cohort (n=400)",
@@ -1404,7 +1404,7 @@ def quantify_uncertainty_and_risk(model_probs_list, qa_score=85.0):
     is_uncertain = bool(top_conf_pct < 65.0 or entropy > 0.68 or disagreement_pct > 14.0 or qa_score < 60.0)
 
     if is_uncertain:
-        risk_level = "INDETERMINATE / UNCERTAIN — SPECIALIST REVIEW REQUIRED"
+        risk_level = "INDETERMINATE / UNCERTAIN - SPECIALIST REVIEW REQUIRED"
         uncertainty_banner = (
             f"UNCERTAIN PREDICTION FLAGGED: Ensemble confidence ({top_conf_pct:.1f}%, 95% CI [{ci_low:.1f}%-{ci_high:.1f}%]) "
             f"or predictive entropy ({entropy_pct:.1f}%) indicates diagnostic ambiguity. A definitive classification is NOT forced; "
@@ -1414,16 +1414,16 @@ def quantify_uncertainty_and_risk(model_probs_list, qa_score=85.0):
         risk_level = "Low Risk (Routine Preventive Surveillance)"
         uncertainty_banner = (
             f"Calibrated Screening Estimate: {top_conf_pct:.1f}% (95% CI: {ci_low:.1f}% - {ci_high:.1f}%, "
-            f"Model Uncertainty Entropy: {entropy_pct:.1f}%). AI screening decision support only — not a confirmed diagnosis."
+            f"Model Uncertainty Entropy: {entropy_pct:.1f}%). AI screening decision support only - not a confirmed diagnosis."
         )
     elif top_conf_pct >= 78.0 and top_idx != 0:
-        risk_level = "Elevated Risk — Prompt Specialist Referral Recommended"
+        risk_level = "Elevated Risk - Prompt Specialist Referral Recommended"
         uncertainty_banner = (
             f"Elevated Risk Screening Flag: {top_conf_pct:.1f}% (95% CI: {ci_low:.1f}% - {ci_high:.1f}%, "
             f"Uncertainty Entropy: {entropy_pct:.1f}%). Findings require confirmation by a board-certified specialist."
         )
     else:
-        risk_level = "Moderate Risk — Clinical Correlation & Specialist Review Advised"
+        risk_level = "Moderate Risk - Clinical Correlation & Specialist Review Advised"
         uncertainty_banner = (
             f"Moderate Risk Screening Estimate: {top_conf_pct:.1f}% (95% CI: {ci_low:.1f}% - {ci_high:.1f}%, "
             f"Uncertainty Entropy: {entropy_pct:.1f}%). Recommend clinical correlation by a specialist."
@@ -1542,9 +1542,9 @@ def run_full_retina_pipeline(img_bgr, biomarker_vec_12=None, suite=None):
         ci = [round(max(0.5, p_c - hw), 2), round(min(98.8, p_c + hw), 2)]
         unc = bool(normal_cut <= p_c <= high_cut)
         if p_c >= high_cut:
-            r_lvl = "Elevated Risk — Specialist Review Advised"
+            r_lvl = "Elevated Risk - Specialist Review Advised"
         elif p_c >= normal_cut:
-            r_lvl = "Borderline / Uncertain — Clinical Correlation Required"
+            r_lvl = "Borderline / Uncertain - Clinical Correlation Required"
         else:
             r_lvl = "Low Risk (Within Physiological Range)"
         return {
@@ -1596,7 +1596,7 @@ def run_full_retina_pipeline(img_bgr, biomarker_vec_12=None, suite=None):
     }
 
     if uq["is_uncertain"]:
-        primary_label = f"Uncertain / Indeterminate ({RETINA_CLASSES[top_idx]} Candidate — Specialist Review Required)"
+        primary_label = f"Uncertain / Indeterminate ({RETINA_CLASSES[top_idx]} Candidate - Specialist Review Required)"
     else:
         primary_label = RETINA_CLASSES[top_idx]
 
@@ -1718,9 +1718,9 @@ def run_full_skin_pipeline(img_bgr, skin_metrics=None, suite=None):
         ci = [round(max(0.5, p_c - hw), 2), round(min(98.5, p_c + hw), 2)]
         unc = bool(35.0 <= p_c <= 58.0)
         if p_c >= 58.0:
-            r_lvl = "Elevated Probability — Dermatologist Evaluation Advised"
+            r_lvl = "Elevated Probability - Dermatologist Evaluation Advised"
         elif p_c >= 35.0:
-            r_lvl = "Borderline / Indeterminate — Clinical Correlation Required"
+            r_lvl = "Borderline / Indeterminate - Clinical Correlation Required"
         else:
             r_lvl = "Low Probability (Baseline Range)"
         return {
@@ -1785,7 +1785,7 @@ def run_full_skin_pipeline(img_bgr, skin_metrics=None, suite=None):
     }
 
     if uq["is_uncertain"]:
-        consensus_diag = f"Uncertain / Indeterminate ({DERM_CLASSES[top_idx]} Candidate — Dermatologist Review Required)"
+        consensus_diag = f"Uncertain / Indeterminate ({DERM_CLASSES[top_idx]} Candidate - Dermatologist Review Required)"
     else:
         consensus_diag = DERM_CLASSES[top_idx]
 
