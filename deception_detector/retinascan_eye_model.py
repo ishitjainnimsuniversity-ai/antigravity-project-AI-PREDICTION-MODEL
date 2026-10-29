@@ -332,12 +332,64 @@ def predict_retina_disease(img_input, cnn_model=None, weights_loaded=False, mode
     resized_bgr = cv2.resize(img_bgr, (IMG_SIZE, IMG_SIZE))
     feature_vec, biomarkers = extract_12_ocular_biomarkers(resized_bgr)
 
-    prior_scores = np.array([
-        max(0.1, 1.0 - max(biomarkers["pupil_opacity"], biomarkers["optic_contrast"], biomarkers["exudate_lesion_score"])),
-        biomarkers["pupil_opacity"] * 0.8 + (1.0 - biomarkers["global_sharpness"]) * 0.2,
-        biomarkers["optic_contrast"] * 0.7 + biomarkers["cup_disc_asymmetry"] * 0.3,
-        biomarkers["exudate_lesion_score"] * 0.4 + biomarkers["hemorrhage_score"] * 0.3 + biomarkers["macular_drusen_score"] * 0.3
-    ], dtype=np.float32)
+    # =========================================================================
+    # PHASE 2: CLINICAL IMAGE QUALITY GATE & REALITY CHECK
+    # =========================================================================
+    try:
+        from eye_hd_quality_gate import EyeQualityGate, CataractBlurValidator, classify_ocular_modality
+        gate = EyeQualityGate()
+        q_eval = gate.evaluate(img_bgr)
+        modality = classify_ocular_modality(img_bgr)
+        if not q_eval["passed"]:
+            return {
+                "diagnosis": "Image quality insufficient for reliable analysis.",
+                "predicted_disease": "Image quality insufficient for reliable analysis.",
+                "confidence": 0.0,
+                "severity": f"Quality Rejection: {q_eval['guidance_message']}",
+                "recommendation": f"Please {q_eval['guidance_message']}. Hold still and increase lighting so eyelashes and iris are in crisp focus.",
+                "probabilities": {
+                    EYE_DISEASE_CLASSES[0]: 0.0,
+                    EYE_DISEASE_CLASSES[1]: 0.0,
+                    EYE_DISEASE_CLASSES[2]: 0.0,
+                    EYE_DISEASE_CLASSES[3]: 0.0
+                },
+                "biomarkers": {k: 0.0 for k in biomarkers if not k.islower()},
+                "raw_biomarkers": biomarkers,
+                "specialized_screenings": {
+                    "Image Quality Gate": "FAILED: " + q_eval["guidance_message"],
+                    "Clinical Status": "Diagnostics blocked until image quality passes minimum criteria."
+                },
+                "model_breakdown": {},
+                "quality_gate_passed": False,
+                "quality_guidance": q_eval["guidance_message"],
+                "quality_metrics": q_eval["metrics"],
+                "modality": modality
+            }
+    except Exception:
+        modality = "ANTERIOR_WEBCAM_EYE"
+        q_eval = {"passed": True, "metrics": {}}
+
+    # Anti-Blur Cataract & Modality-Aware Priors
+    if modality == "ANTERIOR_WEBCAM_EYE":
+        # On anterior webcam eyes, never generate diabetic retinopathy or optic disc glaucoma cupping
+        # Cataract is only suspected if pupil is genuinely cloudy and surrounding eye is sharp
+        cat_prob = 0.05
+        if biomarkers["pupil_opacity"] > 0.70 and biomarkers["global_sharpness"] > 0.40:
+            cat_prob = float(np.clip((biomarkers["pupil_opacity"] - 0.70) * 2.5, 0.05, 0.65))
+        prior_scores = np.array([
+            max(0.40, 1.0 - cat_prob - biomarkers["vascular_redness"] * 0.3),
+            cat_prob,
+            0.0, # Glaucoma optic disc cupping cannot be seen on anterior eye
+            0.0  # Retinal disease cannot be seen on anterior eye
+        ], dtype=np.float32)
+    else:
+        # Posterior Retinal Fundus priors
+        prior_scores = np.array([
+            max(0.1, 1.0 - max(biomarkers["pupil_opacity"], biomarkers["optic_contrast"], biomarkers["exudate_lesion_score"])),
+            biomarkers["pupil_opacity"] * 0.6,
+            biomarkers["optic_contrast"] * 0.7 + biomarkers["cup_disc_asymmetry"] * 0.3,
+            biomarkers["exudate_lesion_score"] * 0.4 + biomarkers["hemorrhage_score"] * 0.3 + biomarkers["macular_drusen_score"] * 0.3
+        ], dtype=np.float32)
     prior_probs = prior_scores / (np.sum(prior_scores) + 1e-6)
 
     if model_suite is None:
