@@ -158,7 +158,7 @@ except ImportError:
 
 # --- CONFIGURATION & STYLING ---
 st.set_page_config(
-    page_title="Vision-AI | Global Diagnostic Suite",
+    page_title="ADVANCED RETINA DERMAL AI | Global Clinical Suite",
     page_icon="🧬",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -5077,7 +5077,7 @@ if 'patient_history' not in st.session_state:
 clf = train_clinical_classifier()
 retina_suite = get_trained_retina_suite()
 
-st.title("🧬 Vision-AI | Clinical Dermatology & Retinal Ophthalmic Diagnostic Suite")
+st.title("🧬 ADVANCED RETINA DERMAL AI | Clinical Ophthalmology & Dermatology Suite")
 st.markdown("#### Real Dermatologist & Ophthalmologist-Grade Analysis - MobileNetV2 Retinal CNN · 12-Biomarker Ocular MLP · CIELab · GLCM · Fitzpatrick")
 
 with st.sidebar:
