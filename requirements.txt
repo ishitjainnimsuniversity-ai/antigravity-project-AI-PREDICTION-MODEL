@@ -9,3 +9,4 @@ opencv-python-headless
 mediapipe
 plotly
 tensorflow-cpu
+pydicom
