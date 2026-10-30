@@ -8,3 +8,8 @@ __pycache__/
 *.msi
 *.zip
 *.rar
+.streamlit/secrets.toml
+.env
+*.key
+*.dat
+secrets.toml
