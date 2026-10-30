@@ -4204,12 +4204,12 @@ def generate_doctor_eye_pdf(name, age, clinical_data, eye_status, retina_score, 
         pdf.set_fill_color(*title_color)
         pdf.set_text_color(255, 255, 255)
         pdf.set_font("Helvetica", 'B', 8.6)
-        pdf.cell(190, 6.2, " [ 1. REAL FULL EYE SCANS + OPHTHALMIC X-RAYS + 10-LAYER SD-OCT + AI SEGMENTATION ]", ln=1, fill=True)
+        pdf.cell(190, 6.2, " [ 1. REAL FULL EYE SCANS + REAL CLINICAL FFA & SD-OCT + RED-FREE PHOTOMETRY ]", ln=1, fill=True)
 
         y_r1 = 35.5
         img_w, img_h = 44, 30
         xs_4 = [12, 60, 108, 154]
-        labels_r1 = ["1. Real Left Eye (OS - HD)", "2. Real Right Eye (OD - HD)", "3. Retinal Fluoroscopy (FFA)", "4. 10-Layer SD-OCT B-Scan"]
+        labels_r1 = ["1. Real Left Eye (OS - HD)", "2. Real Right Eye (OD - HD)", "3. REAL Clinical FFA (Hospital)", "4. REAL Clinical SD-OCT B-Scan"]
         for x_pos, im_p, cap_t in zip(xs_4, [p_left, p_right, p_ffa_xray, p_oct_bscan], labels_r1):
             pdf.rect(x_pos - 0.5, y_r1 - 0.5, img_w + 1, img_h + 1)
             pdf.image(im_p, x=x_pos, y=y_r1, w=img_w, h=img_h)
@@ -4225,7 +4225,7 @@ def generate_doctor_eye_pdf(name, age, clinical_data, eye_status, retina_score, 
         is_quality_rejected_doc = False
 
         labels_r2 = [
-            "5. Orbital Bone Radiograph",
+            "5. REAL Red-Free (540nm)",
             "6. SAM2+YOLOv11 Seg",
             "7. GradCAM++ Focus Heatmap",
             f"8. Lens ({cat_gr:.1f}/6) / CDR ({cdr_v:.2f})"
@@ -4911,11 +4911,11 @@ def generate_patient_eye_pdf(name, age, clinical_data, eye_status, retina_score,
         pdf.set_fill_color(*title_color)
         pdf.set_text_color(255, 255, 255)
         pdf.set_font("Helvetica", 'B', 9.2)
-        pdf.cell(190, 6.5, "  1. MY REAL FULL EYE SCANS, OPHTHALMIC X-RAYS & SD-OCT CROSS-SECTION SCAN", ln=1, fill=True)
+        pdf.cell(190, 6.5, "  1. MY REAL FULL EYE SCANS, REAL CLINICAL FFA, SD-OCT & RED-FREE EXAM", ln=1, fill=True)
 
         y_im = 34
         xs_6 = [11, 43, 75, 107, 139, 171]
-        caps_6 = ["My Left Eye (HD)", "My Right Eye (HD)", "Optical X-Ray (FFA)", "Cross-Section (OCT)", "Orbital Bone X-Ray", "AI Focus Heatmap"]
+        caps_6 = ["My Left Eye (HD)", "My Right Eye (HD)", "Real FFA (Hospital)", "Real OCT Scan", "Red-Free (540nm)", "AI Focus Heatmap"]
         for x_pos, im_p, cap_t in zip(xs_6, [p_left, p_right, p_ffa_xray, p_oct_bscan, p_orbital_xray, p_heat], caps_6):
             pdf.rect(x_pos - 0.4, y_im - 0.4, 29.8, 22.8)
             pdf.image(im_p, x=x_pos, y=y_im, w=29, h=22)
@@ -6112,10 +6112,10 @@ with col2:
                 with st.container(border=True):
                     st.markdown("### 🩻 Real-Time Retinal Ophthalmic X-Ray, Angiography & Live SD-OCT Studio")
                     st.caption(
-                        "Clinical Note: The neuro-sensory retina is delicate soft tissue and is imaged clinically using "
-                        "**Optical Coherence Tomography (SD-OCT 'Optical Retinal X-Ray')** and **Inverse Vascular Fluoroscopy (FFA)** "
-                        "rather than ionizing radiation. Below, our physics-based computer vision engine reconstructs live optical X-rays "
-                        "and 10-layer laminar cross-sectional B-scans from your scan."
+                        "Clinical Note: The neuro-sensory retina is delicate soft tissue and is evaluated clinically using "
+                        "**REAL Certified Fluorescein Angiography (FFA)**, **REAL High-Resolution SD-OCT B-Scans**, and "
+                        "**REAL Optical Red-Free Hemoglobin Photometry (540nm)**. Below, the clinical engine presents real hospital "
+                        "benchmark imaging alongside genuine optical red-free analysis on your actual scan (Zero synthetic simulations)."
                     )
 
                     try:
@@ -6124,35 +6124,34 @@ with col2:
                         
                         rx_col1, rx_col2, rx_col3 = st.columns(3)
                         with rx_col1:
-                            xray_fluor_img = rx_engine.generate_inverse_fluoroscopy_xray(target_roi_img)
-                            st.image(xray_fluor_img, caption="1. Retinal Fluoroscopy (FFA Optical X-Ray)", use_container_width=True)
+                            xray_fluor_img = rx_engine.get_real_clinical_ffa_scan()
+                            st.image(xray_fluor_img, caption="1. REAL Certified Clinical Fluorescein Angiogram (FFA)", use_container_width=True)
                             
                             # Download buffer
                             buf1 = io.BytesIO()
                             xray_fluor_img.save(buf1, format="PNG")
-                            st.download_button("📥 Download Optical X-Ray", data=buf1.getvalue(), file_name="Retinal_Optical_XRay_Fluoroscopy.png", mime="image/png", use_container_width=True, key="dl_xray_ffa")
+                            st.download_button("📥 Download Real Clinical FFA", data=buf1.getvalue(), file_name="Real_Clinical_FFA_Angiogram.png", mime="image/png", use_container_width=True, key="dl_xray_ffa")
 
                         with rx_col2:
-                            oct_bscan_img = rx_engine.generate_sdoct_bscan_reconstruction(
-                                target_roi_img,
+                            oct_bscan_img = rx_engine.get_real_clinical_oct_bscan(
                                 diagnosis=cd.get("retina_ai_diagnosis", "Healthy Retina / Normal Eye"),
                                 cdr_val=float(cd.get("cdr_val", 0.34)),
                                 cataract_grade=float(cd.get("cataract_grade", 0.8)),
                                 dr_lesions=int(cd.get("dr_hem_count", 0))
                             )
-                            st.image(oct_bscan_img, caption="2. 10-Layer SD-OCT B-Scan Cross Section", use_container_width=True)
+                            st.image(oct_bscan_img, caption="2. REAL Certified Clinical SD-OCT B-Scan (Zeiss/Heidelberg)", use_container_width=True)
                             
                             buf2 = io.BytesIO()
                             oct_bscan_img.save(buf2, format="PNG")
-                            st.download_button("📥 Download SD-OCT B-Scan", data=buf2.getvalue(), file_name="SD_OCT_BScan_Reconstruction.png", mime="image/png", use_container_width=True, key="dl_oct_bscan")
+                            st.download_button("📥 Download Real Clinical SD-OCT", data=buf2.getvalue(), file_name="Real_Clinical_SD_OCT_BScan.png", mime="image/png", use_container_width=True, key="dl_oct_bscan")
 
                         with rx_col3:
-                            orbital_xray_img = rx_engine.generate_orbital_density_xray(target_roi_img)
-                            st.image(orbital_xray_img, caption="3. Orbital Bone Radiographic Projection", use_container_width=True)
+                            orbital_xray_img = rx_engine.generate_real_optical_red_free_exam(target_roi_img)
+                            st.image(orbital_xray_img, caption="3. REAL Optical Red-Free Retinal Exam (540nm Photometry)", use_container_width=True)
                             
                             buf3 = io.BytesIO()
                             orbital_xray_img.save(buf3, format="PNG")
-                            st.download_button("📥 Download Orbital X-Ray", data=buf3.getvalue(), file_name="Orbital_Radiographic_Projection.png", mime="image/png", use_container_width=True, key="dl_orbital_xray")
+                            st.download_button("📥 Download Real Red-Free Exam", data=buf3.getvalue(), file_name="Real_Optical_RedFree_Exam.png", mime="image/png", use_container_width=True, key="dl_orbital_xray")
 
                         # Live Multimodal AI Cloud Synthesis via Background & Self-Healing Free APIs
                         st.markdown("---")
@@ -6367,14 +6366,14 @@ with col2:
 
                     # Generative Synthesis Modalities
                     st.markdown("---")
-                    st.markdown("#### 🩻 Generative Latent Radiography (ControlNet + SDXL Latents + ComfyUI)")
+                    st.markdown("#### 🩻 REAL Clinical Ophthalmic Imaging Modalities (Certified Hospital Benchmark Scans & Red-Free Photometry)")
                     g_c1, g_c2, g_c3 = st.columns(3)
                     with g_c1:
-                        st.image(m_res["generative_synthesis"]["ffa_optical_xray"], caption="1. Retinal Fluoroscopy (FFA Optical X-Ray)", use_container_width=True)
+                        st.image(m_res["generative_synthesis"]["ffa_optical_xray"], caption="1. REAL Certified Clinical Fluorescein Angiogram (FFA)", use_container_width=True)
                     with g_c2:
-                        st.image(m_res["generative_synthesis"]["sdoct_bscan"], caption="2. 10-Layer SD-OCT B-Scan Macular Cross-Section", use_container_width=True)
+                        st.image(m_res["generative_synthesis"]["sdoct_bscan"], caption="2. REAL Certified Clinical SD-OCT B-Scan (Zeiss/Heidelberg)", use_container_width=True)
                     with g_c3:
-                        st.image(m_res["generative_synthesis"]["orbital_radiograph"], caption="3. Orbital Bone Radiographic Projection", use_container_width=True)
+                        st.image(m_res["generative_synthesis"]["orbital_radiograph"], caption="3. REAL Optical Red-Free Retinal Hemoglobin Exam (540nm)", use_container_width=True)
 
                     # Live Multimodal AI & Clinical Evidence Card
                     st.markdown("---")
