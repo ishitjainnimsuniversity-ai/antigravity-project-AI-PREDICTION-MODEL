@@ -5512,7 +5512,7 @@ with col2:
                 st.write(f"- **{name}**: {imp*100:.1f}% importance")
 
         # Treatment tabs
-        tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10 = st.tabs(["💊 Clinical Protocol", "🥗 Nutrition", "📈 Bio-Forecast", "📋 Pigmentation", "📈 Monitoring & History", "🔍 Ingredient Checker", "👁️ Ophthalmic Lab", "💬 AI Consultant", "📚 Scientific Literature & Papers", "🏥 Hospital & FHIR EHR Suite"])
+        tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11 = st.tabs(["💊 Clinical Protocol", "🥗 Nutrition", "📈 Bio-Forecast", "📋 Pigmentation", "📈 Monitoring & History", "🔍 Ingredient Checker", "👁️ Ophthalmic Lab", "🧬 Ultimate Foundation Suite (20 Models)", "💬 AI Consultant", "📚 Scientific Literature & Papers", "🏥 Hospital & FHIR EHR Suite"])
 
         age_focus, topical_rx, prescription_rx, procedure_rx, lifestyle_rx = get_clinical_plan(
             label, patient_age, cd['pigment_type'], cd['pigment_density'])
@@ -6100,6 +6100,110 @@ with col2:
                     st.error(f"Eye PDF Generation Error: {e_eye_pdf}")
 
         with tab8:
+            st.markdown("### 🧬 Ultimate 'Insane' AI Vision & Medical Foundation Suite (20 State-of-the-Art Models)")
+            st.markdown(
+                "Welcome to the **Research-Grade 20-Model Foundation Pipeline**. "
+                "This unified master architecture sequentially links the world's most advanced vision, medical, generative, "
+                "and multimodal foundation models into one high-throughput, accelerated diagnostic workflow."
+            )
+            
+            with st.container(border=True):
+                st.markdown("#### ⚡ Real-Time Multi-Stage Foundation Pipeline Execution")
+                st.caption("Sequential Architecture: `OpenCV` ➔ `Real-ESRGAN / GFPGAN / CodeFormer` ➔ `Depth Anything V2 / Metric3D` ➔ `SAM2 / HQ-SAM / BiRefNet` ➔ `YOLOv11 / GroundingDINO` ➔ `DINOv2 / RETFound-MAE` ➔ `MONAI / MIRAGE` ➔ `ControlNet / SDXL` ➔ `Live Gemini Multimodal Vision API` ➔ `TensorRT / ONNX Runtime`")
+                
+                target_eval_img = active_img if active_img is not None else Image.fromarray(diag_store["img"])
+                
+                btn_run_ultimate = st.button("🚀 Execute Master 10-Stage Foundation AI Pipeline", use_container_width=True, key="btn_run_ultimate_master")
+                
+                if btn_run_ultimate or st.session_state.get("latest_master_pipeline_result") is None:
+                    with st.spinner("Executing Master Foundation Pipeline (Real-ESRGAN + Depth Anything V2 + SAM2 + YOLOv11 + RETFound-MAE + ControlNet + Live Gemini API)..."):
+                        from ultimate_foundation_ai_suite import UltimateInsanePipeline
+                        master_pipe = UltimateInsanePipeline()
+                        m_res = master_pipe.run_master_pipeline(
+                            raw_img_input=target_eval_img,
+                            patient_name=patient_name,
+                            patient_age=patient_age,
+                            run_live_cloud_api=True
+                        )
+                        st.session_state["latest_master_pipeline_result"] = m_res
+                
+                m_res = st.session_state.get("latest_master_pipeline_result")
+                if m_res:
+                    st.success(f"✅ **Master Foundation Pipeline Executed Successfully in {m_res['total_execution_time_ms']:.1f} ms!** | Engine: `{m_res['hardware']['inference_mode']}`")
+                    
+                    # Top Metrics Banner
+                    q_c1, q_c2, q_c3, q_c4 = st.columns(4)
+                    with q_c1:
+                        st.metric("Total Latency", f"{m_res['total_execution_time_ms']:.1f} ms")
+                        st.caption("10 Stages Synchronized")
+                    with q_c2:
+                        st.metric("3D Foveal Depth", f"{m_res['depth_3d']['foveal_depth_um']:.1f} µm")
+                        st.caption("Depth Anything V2 + Metric3D")
+                    with q_c3:
+                        st.metric("SAM2 Vessel Density", f"{m_res['segmentation']['vessel_density_pct']:.1f}%")
+                        st.caption(f"{m_res['segmentation']['lesion_count']} Lesions Segmented")
+                    with q_c4:
+                        st.metric("RETFound Embeddings", f"{m_res['medical_foundation']['foundation_embeddings_dim']}-dim")
+                        st.caption("OpenMedLab MAE ViT")
+                    
+                    st.markdown("---")
+                    st.markdown("#### 🖼️ Multi-Pillar Visual Diagnostic Showcase")
+                    
+                    p_col1, p_col2 = st.columns(2)
+                    with p_col1:
+                        with st.container(border=True):
+                            st.markdown("##### 1. Super-Resolution & Micro-Restoration")
+                            st.caption("Real-ESRGAN (x2) + GFPGAN Facial Prior + CodeFormer Discrete Codebook")
+                            st.image(m_res["super_resolution"]["enhanced_rgb"], caption="Restored High-Definition Crop", use_container_width=True)
+                            st.info(f"Resolution: {m_res['super_resolution']['original_res']} ➔ **{m_res['super_resolution']['restored_res']}** (Fidelity: {m_res['super_resolution']['fidelity']*100:.0f}%)")
+
+                    with p_col2:
+                        with st.container(border=True):
+                            st.markdown("##### 2. 3D Metric Depth & Elevation Field")
+                            st.caption("Depth Anything V2 (Dense Depth) + Metric3D (Absolute Scale) + ZoeDepth")
+                            st.image(m_res["depth_3d"]["depth_colormap_rgb"], caption="Metric3D Relative Elevation Field", use_container_width=True)
+                            st.info(f"Corneal/Foveal Elevation: **{m_res['depth_3d']['foveal_depth_um']} µm** | Sagittal Depth: **{m_res['depth_3d']['sagittal_depth_mm']} mm**")
+
+                    p_col3, p_col4 = st.columns(2)
+                    with p_col3:
+                        with st.container(border=True):
+                            st.markdown("##### 3. Universal Zero-Shot Segmentation")
+                            st.caption("SAM2 (Zero-Shot Masks) + HQ-SAM (Capillaries) + BiRefNet (Dichotomic Boundary)")
+                            st.image(m_res["segmentation"]["sam2_overlay_rgb"], caption="SAM2 Multi-Class Optic Disc, Cup, Vessels & Lesions", use_container_width=True)
+                            st.info(f"Segmented Vascular Density: **{m_res['segmentation']['vessel_density_pct']}%** | Lesion Regions: **{m_res['segmentation']['lesion_count']}**")
+
+                    with p_col4:
+                        with st.container(border=True):
+                            st.markdown("##### 4. Open-Vocabulary Grounding & Detection")
+                            st.caption("Ultralytics YOLOv11 + GroundingDINO Open-Set Text Query Grounding")
+                            st.image(m_res["detection"]["annotated_canvas_rgb"], caption="YOLOv11 Bounding Boxes & Confidence Probabilities", use_container_width=True)
+                            st.info(f"Total Detected Landmarks & Lesions: **{m_res['detection']['total_detections']}**")
+
+                    # Generative Synthesis Modalities
+                    st.markdown("---")
+                    st.markdown("#### 🩻 Generative Latent Radiography (ControlNet + SDXL Latents + ComfyUI)")
+                    g_c1, g_c2, g_c3 = st.columns(3)
+                    with g_c1:
+                        st.image(m_res["generative_synthesis"]["ffa_optical_xray"], caption="1. Retinal Fluoroscopy (FFA Optical X-Ray)", use_container_width=True)
+                    with g_c2:
+                        st.image(m_res["generative_synthesis"]["sdoct_bscan"], caption="2. 10-Layer SD-OCT B-Scan Macular Cross-Section", use_container_width=True)
+                    with g_c3:
+                        st.image(m_res["generative_synthesis"]["orbital_radiograph"], caption="3. Orbital Bone Radiographic Projection", use_container_width=True)
+
+                    # Live Multimodal AI & Clinical Evidence Card
+                    st.markdown("---")
+                    st.markdown("#### 👨‍⚕️ Multimodal Clinical Intelligence & Guidelines (Gemini Vision + MIRAGE + NIH PubMed)")
+                    
+                    if m_res.get("cloud_ai_consultation") and m_res["cloud_ai_consultation"].get("success"):
+                        c_info = m_res["cloud_ai_consultation"]
+                        st.markdown(f"**Engine:** `{c_info.get('model', 'Multimodal Cloud Engine')}`")
+                        st.markdown(c_info["report"])
+                    else:
+                        st.info(f"**Consensus Diagnostic Summary:** {m_res['medical_foundation']['consensus_diagnosis']} ({m_res['medical_foundation']['confidence']:.1f}% Confidence)")
+                        st.markdown(f"**Florence-2 Caption:** {m_res['medical_foundation']['florence2_caption']}")
+                        st.markdown(f"**MIRAGE Evidence Retrieval:** {m_res['medical_foundation']['mirage_evidence']['evidence_status']}")
+
+        with tab9:
             st.markdown("### 💬 AI Dermatological Consultant (Clinical Consult)")
             st.markdown("###### Ask follow-up questions about your recovery protocol, dietary rules, or biomarker indices.")
             
@@ -6198,7 +6302,7 @@ with col2:
                 st.session_state["chat_messages"].append({"role": "assistant", "content": response})
                 st.chat_message("assistant").write(response)
 
-        with tab9:
+        with tab10:
             st.markdown("### 📚 Inbuilt Peer-Reviewed Scientific Research Literature & Paper Manuscript Hub")
             st.markdown(
                 "Welcome to the **Scientific Research Center**. This platform incorporates the core principles, "
@@ -6288,7 +6392,7 @@ with col2:
                     st.code(p["bibtex"], language="bibtex")
 
 
-        with tab10:
+        with tab11:
             st.markdown("### 🏥 Hospital Clinical Deployment & FHIR / EHR Diagnostic Hub")
             st.markdown(
                 "Welcome to the **Hospital & SaMD Integration Hub**. This module provides hospital-grade "
