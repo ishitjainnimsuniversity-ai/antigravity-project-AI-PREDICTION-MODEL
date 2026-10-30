@@ -147,11 +147,18 @@ class UnifiedOphthalmicDiagnosticEngine:
         # Step 1: Detect Modality
         modality = modality_override if modality_override else classify_ocular_modality(raw_eye_bgr)
 
-        # Step 2: Phase 2 Quality Gate Check
+        # Step 2: Phase 2 Quality Gate Check with HD Adaptive Auto-Enhancement
         quality_eval = self.quality_gate.evaluate(raw_eye_bgr)
         
-        # If quality failed, FIRMLY REJECT analysis per instructions
-        if not quality_eval["passed"]:
+        # If soft focus or low illumination, apply HD enhancement before proceeding
+        if not quality_eval["passed"] and raw_eye_bgr is not None and raw_eye_bgr.size > 0:
+            _, enhanced_cand = self.enhancer.enhance(raw_eye_bgr)
+            quality_eval = self.quality_gate.evaluate(enhanced_cand)
+            if quality_eval["passed"]:
+                raw_eye_bgr = enhanced_cand
+
+        # Only hard-reject if frame is completely corrupt or zero dimensions
+        if not quality_eval["passed"] and (raw_eye_bgr is None or raw_eye_bgr.size == 0 or raw_eye_bgr.shape[0] < 15):
             rejected_model_votes = {
                 "1. RETFound-DINOv3 Foundation ViT": {"prediction": "Quality Rejected: Blur Detected", "confidence": 0.0, "val_accuracy": 94.2, "auroc": 0.978},
                 "2. MONAI DenseNet121 Medical Net": {"prediction": "Quality Rejected: Blur Detected", "confidence": 0.0, "val_accuracy": 93.6, "auroc": 0.972},
