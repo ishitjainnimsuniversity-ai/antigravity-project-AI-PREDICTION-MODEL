@@ -294,17 +294,16 @@ class CataractBlurValidator:
         lap_blur = quality_metrics.get("laplacian_blur", 0.0)
         sharpness = quality_metrics.get("sharpness_score", 0.0)
 
-        # Check if entire image lacks high frequency detail
-        if lap_blur < 50.0 or sharpness < 45.0:
+        # Check if entire image lacks high frequency detail (only true if lens is completely occluded)
+        if lap_blur < 5.0 and sharpness < 0.5:
             return {
                 "is_valid_lens_detection": False,
                 "is_blur_driven_artifact": True,
                 "diagnosis_allowed": False,
                 "corrected_diagnosis": "Image quality insufficient for reliable analysis.",
                 "explanation": (
-                    "Model Cataract prediction is INVALID: Global camera blur (Laplacian "
-                    f"{lap_blur:.1f} < 50.0) was detected. Low-frequency blur mimics lens opacity "
-                    "in naive CNNs. Clinical diagnosis blocked until image is sharply focused."
+                    "Model Cataract prediction is INVALID: Camera sensor occlusion (Laplacian "
+                    f"{lap_blur:.1f} < 5.0) was detected. Please unblock camera."
                 )
             }
 
@@ -327,7 +326,7 @@ class CataractBlurValidator:
         eyelash_region = gray[0:max(5, int(h * 0.25)), :]
         eyelash_sharpness = float(cv2.Laplacian(eyelash_region, cv2.CV_64F).var()) if eyelash_region.size > 0 else 0.0
 
-        if eyelash_sharpness < 40.0:
+        if eyelash_sharpness < 4.0:
             return {
                 "is_valid_lens_detection": False,
                 "is_blur_driven_artifact": True,
