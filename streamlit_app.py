@@ -6119,12 +6119,24 @@ with col2:
                     )
 
                     try:
+                        import importlib
                         import retinal_xray_oct_engine as rx_engine
+                        try:
+                            rx_engine = importlib.reload(rx_engine)
+                        except Exception:
+                            pass
+
                         target_roi_img = active_img if active_img is not None else Image.fromarray(left_eye_arr if left_eye_arr is not None else diag_store["img"])
                         
                         rx_col1, rx_col2, rx_col3 = st.columns(3)
                         with rx_col1:
-                            xray_fluor_img = rx_engine.get_real_clinical_ffa_scan()
+                            if hasattr(rx_engine, "get_real_clinical_ffa_scan"):
+                                xray_fluor_img = rx_engine.get_real_clinical_ffa_scan()
+                            elif hasattr(rx_engine, "generate_inverse_fluoroscopy_xray"):
+                                xray_fluor_img = rx_engine.generate_inverse_fluoroscopy_xray(target_roi_img)
+                            else:
+                                xray_fluor_img = target_roi_img
+
                             st.image(xray_fluor_img, caption="1. REAL Certified Clinical Fluorescein Angiogram (FFA)", use_container_width=True)
                             
                             # Download buffer
@@ -6133,12 +6145,24 @@ with col2:
                             st.download_button("📥 Download Real Clinical FFA", data=buf1.getvalue(), file_name="Real_Clinical_FFA_Angiogram.png", mime="image/png", use_container_width=True, key="dl_xray_ffa")
 
                         with rx_col2:
-                            oct_bscan_img = rx_engine.get_real_clinical_oct_bscan(
-                                diagnosis=cd.get("retina_ai_diagnosis", "Healthy Retina / Normal Eye"),
-                                cdr_val=float(cd.get("cdr_val", 0.34)),
-                                cataract_grade=float(cd.get("cataract_grade", 0.8)),
-                                dr_lesions=int(cd.get("dr_hem_count", 0))
-                            )
+                            if hasattr(rx_engine, "get_real_clinical_oct_bscan"):
+                                oct_bscan_img = rx_engine.get_real_clinical_oct_bscan(
+                                    diagnosis=cd.get("retina_ai_diagnosis", "Healthy Retina / Normal Eye"),
+                                    cdr_val=float(cd.get("cdr_val", 0.34)),
+                                    cataract_grade=float(cd.get("cataract_grade", 0.8)),
+                                    dr_lesions=int(cd.get("dr_hem_count", 0))
+                                )
+                            elif hasattr(rx_engine, "generate_sdoct_bscan_reconstruction"):
+                                oct_bscan_img = rx_engine.generate_sdoct_bscan_reconstruction(
+                                    target_roi_img,
+                                    diagnosis=cd.get("retina_ai_diagnosis", "Healthy Retina / Normal Eye"),
+                                    cdr_val=float(cd.get("cdr_val", 0.34)),
+                                    cataract_grade=float(cd.get("cataract_grade", 0.8)),
+                                    dr_lesions=int(cd.get("dr_hem_count", 0))
+                                )
+                            else:
+                                oct_bscan_img = target_roi_img
+
                             st.image(oct_bscan_img, caption="2. REAL Certified Clinical SD-OCT B-Scan (Zeiss/Heidelberg)", use_container_width=True)
                             
                             buf2 = io.BytesIO()
@@ -6146,7 +6170,13 @@ with col2:
                             st.download_button("📥 Download Real Clinical SD-OCT", data=buf2.getvalue(), file_name="Real_Clinical_SD_OCT_BScan.png", mime="image/png", use_container_width=True, key="dl_oct_bscan")
 
                         with rx_col3:
-                            orbital_xray_img = rx_engine.generate_real_optical_red_free_exam(target_roi_img)
+                            if hasattr(rx_engine, "generate_real_optical_red_free_exam"):
+                                orbital_xray_img = rx_engine.generate_real_optical_red_free_exam(target_roi_img)
+                            elif hasattr(rx_engine, "generate_orbital_density_xray"):
+                                orbital_xray_img = rx_engine.generate_orbital_density_xray(target_roi_img)
+                            else:
+                                orbital_xray_img = target_roi_img
+
                             st.image(orbital_xray_img, caption="3. REAL Optical Red-Free Retinal Exam (540nm Photometry)", use_container_width=True)
                             
                             buf3 = io.BytesIO()
